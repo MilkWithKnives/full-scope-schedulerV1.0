@@ -1,0 +1,193 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id        String     @id @default(cuid())
+  name      String
+  plan      String     @default("free")
+  locations Location[]
+  users     User[]
+  createdAt DateTime   @default(now())
+}
+
+model User {
+  id                     String             @id @default(cuid())
+  email                  String             @unique
+  name                   String
+  password               String?            // Null for magic-link only users
+  role                   Role               @default(EMPLOYEE)
+  organizationId         String
+  organization           Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  shifts                 Shift[]
+  availability           Availability[]
+  defaultHourlyRate      Float?             // Default pay rate for labor cost
+  swapRequests           ShiftSwapRequest[] @relation("SwapRequester")
+  timeEntries            TimeEntry[]
+  tipRecords             TipRecord[]
+  timeOffRequests        TimeOffRequest[]
+  timeOffReviewsApproved TimeOffRequest[]   @relation("TimeOffReviewer")
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+}
+
+enum Role {
+  OWNER
+  MANAGER
+  EMPLOYEE
+}
+
+model Location {
+  id             String       @id @default(cuid())
+  name           String
+  address        String
+  latitude       Float? // For GPS geofencing
+  longitude      Float?
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  shifts         Shift[]
+  timeEntries    TimeEntry[]
+  createdAt      DateTime     @default(now())
+}
+
+model Shift {
+  id               String             @id @default(cuid())
+  startTime        DateTime
+  endTime          DateTime
+  userId           String?
+  user             User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  locationId       String
+  location         Location           @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  role             String
+  status           ShiftStatus        @default(DRAFT)
+  notes            String?
+  breakMinutes     Int                @default(30) // Unpaid break time
+  hourlyRate       Float?             // For labor cost calculation
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  swapRequestsFrom ShiftSwapRequest[] @relation("FromShift")
+  swapRequestsTo   ShiftSwapRequest[] @relation("ToShift")
+  timeEntries      TimeEntry[]
+  tipRecords       TipRecord[]
+}
+
+enum ShiftStatus {
+  DRAFT
+  PUBLISHED
+  CONFIRMED
+  CANCELLED
+}
+
+model Availability {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dayOfWeek   Int      // 0-6 (Sunday-Saturday)
+  startTime   String   // HH:MM format
+  endTime     String   // HH:MM format
+  isRecurring Boolean  @default(true) // Weekly recurring or one-time
+  specificDate DateTime? // For one-time availability overrides
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, dayOfWeek])
+}
+
+model ShiftSwapRequest {
+  id            String     @id @default(cuid())
+  fromShiftId   String
+  fromShift     Shift      @relation("FromShift", fields: [fromShiftId], references: [id], onDelete: Cascade)
+  toShiftId     String
+  toShift       Shift      @relation("ToShift", fields: [toShiftId], references: [id], onDelete: Cascade)
+  requestedById String
+  requestedBy   User       @relation("SwapRequester", fields: [requestedById], references: [id], onDelete: Cascade)
+  status        SwapStatus @default(PENDING)
+  autoApproved  Boolean    @default(false) // True if swap was auto-approved (no conflicts)
+  reason        String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+enum SwapStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model ShiftTemplate {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String   // e.g., "Morning Server Shift"
+  dayOfWeek      Int      // 0-6 (Sunday-Saturday)
+  startTime      String   // HH:MM format
+  endTime        String   // HH:MM format
+  role           String
+  locationId     String?
+  breakMinutes   Int      @default(30)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+}
+
+model TimeEntry {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shiftId    String?
+  shift      Shift?    @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  clockIn    DateTime
+  clockOut   DateTime?
+  clockInLat Float? // GPS coordinates for clock-in verification
+  clockInLng Float?
+  locationId String
+  location   Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model TipRecord {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shiftId   String?
+  shift     Shift?   @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  amount    Float // Credit card tips only
+  date      DateTime
+  createdAt DateTime @default(now())
+}
+
+model TimeOffRequest {
+  id         String           @id @default(cuid())
+  userId     String
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startDate  DateTime
+  endDate    DateTime
+  reason     String?
+  status     TimeOffStatus    @default(PENDING)
+  reviewedBy String?
+  reviewer   User?            @relation("TimeOffReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+}
+
+enum TimeOffStatus {
+  PENDING
+  APPROVED
+  DENIED
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}

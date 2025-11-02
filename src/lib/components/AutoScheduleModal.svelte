@@ -17,11 +17,17 @@
 	let loading = $state(false);
 	let suggestions = $state<any>(null);
 	let maxHoursPerWeek = $state(40);
+	let minRestHours = $state(8);
+	let maxConsecutiveDays = $state(6);
+	let preferredLocationWeight = $state(1.2);
 	let costOptimization = $state(true);
+	let fairDistribution = $state(true);
+	let minScoreThreshold = $state(60);
 	let selectedSuggestions = $state<Set<string>>(new Set());
 	let showAIAssistant = $state(false);
 	let aiResponse = $state('');
 	let aiLoading = $state(false);
+	let showAdvancedOptions = $state(false);
 
 	async function handleGenerateSuggestions() {
 		loading = true;
@@ -29,7 +35,12 @@
 		const formData = new FormData();
 		formData.append('weekStart', weekStart);
 		formData.append('maxHoursPerWeek', maxHoursPerWeek.toString());
+		formData.append('minRestHours', minRestHours.toString());
+		formData.append('maxConsecutiveDays', maxConsecutiveDays.toString());
+		formData.append('preferredLocationWeight', preferredLocationWeight.toString());
 		formData.append('costOptimization', costOptimization.toString());
+		formData.append('fairDistribution', fairDistribution.toString());
+		formData.append('minScoreThreshold', minScoreThreshold.toString());
 
 		try {
 			const response = await fetch('?/autoSchedule', {
@@ -236,38 +247,151 @@
 							<ul class="text-sm text-primary-800 dark:text-primary-200 space-y-1">
 								<li>✓ Analyzes employee availability and preferences</li>
 								<li>✓ Considers work-life balance (max hours, rest time)</li>
+								<li>✓ Respects skill requirements and seniority</li>
 								<li>✓ Optimizes for cost and fair distribution</li>
 								<li>✓ Avoids scheduling conflicts automatically</li>
 							</ul>
 						</div>
 
-						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-							<div>
-								<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-									Max Hours per Week
-								</label>
-								<input
-									type="number"
-									bind:value={maxHoursPerWeek}
-									min="20"
-									max="60"
-									class="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
-								/>
+						<!-- Basic Options -->
+						<div class="space-y-4">
+							<h3 class="text-sm font-semibold text-slate-900 dark:text-white">Basic Constraints</h3>
+
+							<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+								<div>
+									<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+										Max Hours/Week
+									</label>
+									<input
+										type="number"
+										bind:value={maxHoursPerWeek}
+										min="20"
+										max="60"
+										class="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+									/>
+								</div>
+
+								<div>
+									<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+										Min Rest Hours
+									</label>
+									<input
+										type="number"
+										bind:value={minRestHours}
+										min="4"
+										max="24"
+										class="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+									/>
+								</div>
+
+								<div>
+									<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+										Max Consecutive Days
+									</label>
+									<input
+										type="number"
+										bind:value={maxConsecutiveDays}
+										min="1"
+										max="14"
+										class="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+									/>
+								</div>
 							</div>
 
-							<div class="flex items-end">
-								<label class="flex items-center gap-3 cursor-pointer">
+							<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+								<label class="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
 									<input
 										type="checkbox"
 										bind:checked={costOptimization}
 										class="w-5 h-5 text-primary-500 rounded focus:ring-2 focus:ring-primary-500"
 									/>
-									<span class="text-sm font-medium text-slate-700 dark:text-slate-300">
-										Optimize for labor cost
-									</span>
+									<div>
+										<div class="text-sm font-medium text-slate-700 dark:text-slate-300">
+											Cost Optimization
+										</div>
+										<div class="text-xs text-slate-500 dark:text-slate-400">
+											Prioritize lower-cost employees
+										</div>
+									</div>
+								</label>
+
+								<label class="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+									<input
+										type="checkbox"
+										bind:checked={fairDistribution}
+										class="w-5 h-5 text-primary-500 rounded focus:ring-2 focus:ring-primary-500"
+									/>
+									<div>
+										<div class="text-sm font-medium text-slate-700 dark:text-slate-300">
+											Fair Distribution
+										</div>
+										<div class="text-xs text-slate-500 dark:text-slate-400">
+											Balance hours evenly
+										</div>
+									</div>
 								</label>
 							</div>
 						</div>
+
+						<!-- Advanced Options Toggle -->
+						<button
+							type="button"
+							onclick={() => showAdvancedOptions = !showAdvancedOptions}
+							class="text-sm text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-2"
+						>
+							<span>{showAdvancedOptions ? '▼' : '▶'}</span>
+							Advanced Options
+						</button>
+
+						{#if showAdvancedOptions}
+							<div class="space-y-4 border-t border-slate-200 dark:border-slate-700 pt-4">
+								<!-- Preferred Location Weight -->
+								<div>
+									<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+										Preferred Location Priority
+									</label>
+									<input
+										type="range"
+										bind:value={preferredLocationWeight}
+										min="1"
+										max="3"
+										step="0.1"
+										class="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary-500"
+									/>
+									<div class="flex justify-between text-xs text-slate-600 dark:text-slate-400 mt-1">
+										<span>Low (1.0)</span>
+										<span class="font-medium text-slate-900 dark:text-white">{parseFloat(preferredLocationWeight.toString()).toFixed(1)}x</span>
+										<span>High (3.0)</span>
+									</div>
+									<p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+										How much weight to give to employees' preferred locations
+									</p>
+								</div>
+
+								<!-- Min Score Threshold -->
+								<div>
+									<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+										Minimum Match Score
+									</label>
+									<input
+										type="range"
+										bind:value={minScoreThreshold}
+										min="0"
+										max="100"
+										step="5"
+										class="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary-500"
+									/>
+									<div class="flex justify-between text-xs text-slate-600 dark:text-slate-400 mt-1">
+										<span>Lenient (0)</span>
+										<span class="font-medium text-slate-900 dark:text-white">{minScoreThreshold}%</span>
+										<span>Strict (100)</span>
+									</div>
+									<p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+										Only suggest assignments with scores above this threshold
+									</p>
+								</div>
+							</div>
+						{/if}
 
 						<Button
 							variant="primary"

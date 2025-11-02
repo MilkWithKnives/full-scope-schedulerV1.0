@@ -371,7 +371,9 @@
 
 <!-- Apply Templates Modal -->
 {#if showApplyModal}
-	<div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+	<div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" tabindex="-1">
+		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 		<div
 			class="bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
 			onclick={(e) => e.stopPropagation()}
@@ -394,10 +396,11 @@
 
 			<div class="p-6 space-y-6">
 				<div>
-					<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+					<label for="week-start-date" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
 						Week Starting Date
 					</label>
 					<input
+						id="week-start-date"
 						type="date"
 						bind:value={weekStart}
 						class="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500"

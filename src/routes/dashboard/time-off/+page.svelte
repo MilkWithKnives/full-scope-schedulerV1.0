@@ -163,6 +163,7 @@
 					<div>
 						<Input
 							type="date"
+							name="startDate"
 							label="Start Date"
 							bind:value={startDate}
 							required
@@ -171,6 +172,7 @@
 					<div>
 						<Input
 							type="date"
+							name="endDate"
 							label="End Date"
 							bind:value={endDate}
 							required
@@ -179,10 +181,11 @@
 				</div>
 
 				<div>
-					<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+					<label for="time-off-reason" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
 						Reason (optional)
 					</label>
 					<textarea
+						id="time-off-reason"
 						bind:value={reason}
 						rows="3"
 						placeholder="Why do you need time off?"

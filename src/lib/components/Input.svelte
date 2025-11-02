@@ -1,6 +1,6 @@
 <script lang="ts">
 	interface Props {
-		type?: 'text' | 'email' | 'password' | 'number' | 'tel';
+		type?: 'text' | 'email' | 'password' | 'number' | 'tel' | 'date' | 'datetime-local' | 'time';
 		name: string;
 		label?: string;
 		placeholder?: string;
@@ -8,8 +8,11 @@
 		error?: string;
 		disabled?: boolean;
 		required?: boolean;
-		autocomplete?: string;
+		autocomplete?: AutoFill;
 		class?: string;
+		min?: string;
+		max?: string;
+		step?: string;
 	}
 
 	let {
@@ -22,7 +25,10 @@
 		disabled = false,
 		required = false,
 		autocomplete,
-		class: className = ''
+		class: className = '',
+		min,
+		max,
+		step
 	}: Props = $props();
 
 	const baseStyles =
@@ -54,6 +60,9 @@
 	{disabled}
 	{required}
 	{autocomplete}
+	{min}
+	{max}
+	{step}
 	class={computedClass}
 	aria-invalid={error ? 'true' : 'false'}
 	aria-describedby={error ? `${name}-error` : undefined}

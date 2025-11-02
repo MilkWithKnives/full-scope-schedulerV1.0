@@ -16,6 +16,10 @@ interface ShiftRequirement {
 	locationId: string;
 	role: string;
 	breakMinutes: number;
+	requiredSkills: string[];
+	shiftType: string | null;
+	priority: number;
+	minSeniority: number | null;
 }
 
 interface Employee {
@@ -24,10 +28,18 @@ interface Employee {
 	role: string;
 	defaultHourlyRate: number | null;
 	preferredLocationId: string | null;
+	maxHoursPerWeek: number | null;
+	minHoursPerWeek: number | null;
+	maxConsecutiveDays: number | null;
+	minRestHours: number | null;
+	skills: string[];
+	shiftTypePreferences: string[];
+	seniority: number | null;
 	availability: Array<{
 		dayOfWeek: number;
 		startTime: string;
 		endTime: string;
+		isPreferred: boolean;
 	}>;
 	existingShifts: Array<{
 		startTime: Date;
@@ -84,13 +96,18 @@ export async function generateScheduleSuggestions(
 	weekEnd: Date,
 	constraints: SchedulingConstraints = {}
 ): Promise<ScheduleResult> {
-	// Set default constraints
+	// Fetch scheduling preferences from database
+	const schedulingPrefs = await prisma.schedulingPreferences.findUnique({
+		where: { organizationId }
+	});
+
+	// Set default constraints (use DB preferences if available, then passed constraints, then hardcoded defaults)
 	const config = {
-		maxHoursPerWeek: constraints.maxHoursPerWeek || 40,
-		maxConsecutiveDays: constraints.maxConsecutiveDays || 6,
-		minRestHoursBetweenShifts: constraints.minRestHoursBetweenShifts || 8,
-		preferredLocationWeight: constraints.preferredLocationWeight || 1.2,
-		costOptimization: constraints.costOptimization ?? true
+		maxHoursPerWeek: constraints.maxHoursPerWeek || schedulingPrefs?.defaultMaxHoursPerWeek || 40,
+		maxConsecutiveDays: constraints.maxConsecutiveDays || schedulingPrefs?.defaultMaxConsecutiveDays || 6,
+		minRestHoursBetweenShifts: constraints.minRestHoursBetweenShifts || schedulingPrefs?.defaultMinRestHours || 8,
+		preferredLocationWeight: constraints.preferredLocationWeight || schedulingPrefs?.preferredLocationWeight || 1.2,
+		costOptimization: constraints.costOptimization ?? schedulingPrefs?.costOptimizationEnabled ?? true
 	};
 
 	// Fetch unassigned shifts in the date range
@@ -146,8 +163,20 @@ export async function generateScheduleSuggestions(
 		name: emp.name,
 		role: emp.role,
 		defaultHourlyRate: emp.defaultHourlyRate,
-		preferredLocationId: (emp as any).preferredLocationId || null,
-		availability: emp.availability,
+		preferredLocationId: emp.preferredLocationId,
+		maxHoursPerWeek: emp.maxHoursPerWeek,
+		minHoursPerWeek: emp.minHoursPerWeek,
+		maxConsecutiveDays: emp.maxConsecutiveDays,
+		minRestHours: emp.minRestHours,
+		skills: emp.skills,
+		shiftTypePreferences: emp.shiftTypePreferences,
+		seniority: emp.seniority,
+		availability: emp.availability.map((a) => ({
+			dayOfWeek: a.dayOfWeek,
+			startTime: a.startTime,
+			endTime: a.endTime,
+			isPreferred: a.isPreferred
+		})),
 		existingShifts: emp.shifts.map((s) => ({
 			startTime: s.startTime,
 			endTime: s.endTime
@@ -160,7 +189,11 @@ export async function generateScheduleSuggestions(
 		endTime: shift.endTime,
 		locationId: shift.locationId,
 		role: shift.role,
-		breakMinutes: shift.breakMinutes
+		breakMinutes: shift.breakMinutes,
+		requiredSkills: shift.requiredSkills,
+		shiftType: shift.shiftType,
+		priority: shift.priority,
+		minSeniority: shift.minSeniority
 	}));
 
 	// Run the scheduling algorithm
@@ -267,21 +300,53 @@ function evaluateEmployeeForShift(
 	const reasons: string[] = [];
 	const warnings: string[] = [];
 
+	// Check required skills
+	if (shift.requiredSkills.length > 0) {
+		const hasAllSkills = shift.requiredSkills.every((skill) => employee.skills.includes(skill));
+		if (!hasAllSkills) {
+			const missingSkills = shift.requiredSkills.filter((skill) => !employee.skills.includes(skill));
+			return { score: 0, reasons: [`Missing required skills: ${missingSkills.join(', ')}`], warnings: [] };
+		}
+		score += 10;
+		reasons.push('Has all required skills');
+	}
+
+	// Check minimum seniority requirement
+	if (shift.minSeniority !== null && shift.minSeniority > 0) {
+		const employeeSeniority = employee.seniority || 0;
+		if (employeeSeniority < shift.minSeniority) {
+			return { score: 0, reasons: [`Requires ${shift.minSeniority} years experience, has ${employeeSeniority}`], warnings: [] };
+		}
+		if (employeeSeniority >= shift.minSeniority) {
+			score += 5;
+			reasons.push('Meets seniority requirement');
+		}
+	}
+
 	// Check availability
 	const shiftDay = shift.startTime.getDay();
-	const availability = employee.availability.find((a) => a.dayOfWeek === shiftDay);
+	const availabilities = employee.availability.filter((a) => a.dayOfWeek === shiftDay);
 
-	if (!availability) {
+	if (availabilities.length === 0) {
 		return { score: 0, reasons: ['Employee not available on this day'], warnings: [] };
 	}
 
-	// Check if shift time overlaps with availability
+	// Find matching availability block
 	const shiftStartMinutes = shift.startTime.getHours() * 60 + shift.startTime.getMinutes();
 	const shiftEndMinutes = shift.endTime.getHours() * 60 + shift.endTime.getMinutes();
-	const availStartMinutes = timeToMinutes(availability.startTime);
-	const availEndMinutes = timeToMinutes(availability.endTime);
 
-	if (shiftStartMinutes < availStartMinutes || shiftEndMinutes > availEndMinutes) {
+	let matchingAvailability = null;
+	for (const avail of availabilities) {
+		const availStartMinutes = timeToMinutes(avail.startTime);
+		const availEndMinutes = timeToMinutes(avail.endTime);
+
+		if (shiftStartMinutes >= availStartMinutes && shiftEndMinutes <= availEndMinutes) {
+			matchingAvailability = avail;
+			break;
+		}
+	}
+
+	if (!matchingAvailability) {
 		return {
 			score: 0,
 			reasons: ['Shift time is outside employee availability window'],
@@ -289,8 +354,14 @@ function evaluateEmployeeForShift(
 		};
 	}
 
-	score += 15;
-	reasons.push('Available during shift time');
+	// Bonus for preferred availability
+	if (matchingAvailability.isPreferred) {
+		score += 20;
+		reasons.push('Preferred availability time');
+	} else {
+		score += 15;
+		reasons.push('Available during shift time');
+	}
 
 	// Check for conflicts with existing shifts
 	for (const existingShift of employee.existingShifts) {
@@ -298,13 +369,14 @@ function evaluateEmployeeForShift(
 			return { score: 0, reasons: ['Conflicts with existing shift'], warnings: [] };
 		}
 
-		// Check minimum rest time between shifts
+		// Check minimum rest time between shifts (use employee preference if set, otherwise use config)
+		const requiredRestHours = employee.minRestHours || config.minRestHoursBetweenShifts || 8;
 		const hoursBetween = Math.abs(
 			differenceInMinutes(shift.startTime, existingShift.endTime)
 		) / 60;
 
-		if (hoursBetween < (config.minRestHoursBetweenShifts || 8)) {
-			warnings.push(`Only ${hoursBetween.toFixed(1)} hours rest before this shift`);
+		if (hoursBetween < requiredRestHours) {
+			warnings.push(`Only ${hoursBetween.toFixed(1)} hours rest (needs ${requiredRestHours}h)`);
 			score -= 10;
 		}
 	}
@@ -316,18 +388,27 @@ function evaluateEmployeeForShift(
 	}, 0);
 	const totalHours = existingHours + shiftHours;
 
-	if (totalHours > (config.maxHoursPerWeek || 40)) {
-		warnings.push(`Would exceed max hours (${totalHours.toFixed(1)}/${config.maxHoursPerWeek}h)`);
+	// Use employee's max hours if set, otherwise use config default
+	const maxHours = employee.maxHoursPerWeek || config.maxHoursPerWeek || 40;
+	const minHours = employee.minHoursPerWeek || 0;
+
+	if (totalHours > maxHours) {
+		warnings.push(`Would exceed max hours (${totalHours.toFixed(1)}/${maxHours}h)`);
 		score -= 15;
+	} else if (totalHours < minHours) {
+		// Bonus for helping employee reach minimum hours
+		score += 8;
+		reasons.push(`Helps reach minimum hours (${totalHours.toFixed(1)}/${minHours}h target)`);
 	} else {
 		score += 10;
 		reasons.push('Within weekly hour limits');
 	}
 
-	// Check consecutive days
+	// Check consecutive days (use employee preference if set)
+	const maxConsecutive = employee.maxConsecutiveDays || config.maxConsecutiveDays || 6;
 	const consecutiveDays = countConsecutiveDays(employee.existingShifts, shift.startTime);
-	if (consecutiveDays >= (config.maxConsecutiveDays || 6)) {
-		warnings.push(`Would work ${consecutiveDays + 1} consecutive days`);
+	if (consecutiveDays >= maxConsecutive) {
+		warnings.push(`Would work ${consecutiveDays + 1} consecutive days (max ${maxConsecutive})`);
 		score -= 10;
 	}
 
@@ -335,6 +416,20 @@ function evaluateEmployeeForShift(
 	if (employee.preferredLocationId === shift.locationId) {
 		score += 15 * (config.preferredLocationWeight || 1.2);
 		reasons.push('Preferred location match');
+	}
+
+	// Shift type preference bonus
+	if (shift.shiftType && employee.shiftTypePreferences.length > 0) {
+		if (employee.shiftTypePreferences.includes(shift.shiftType)) {
+			score += 12;
+			reasons.push(`Preferred shift type (${shift.shiftType})`);
+		}
+	}
+
+	// Priority shift bonus (higher priority = more important to fill)
+	if (shift.priority > 5) {
+		score += shift.priority * 2;
+		reasons.push(`High priority shift (${shift.priority}/10)`);
 	}
 
 	// Cost optimization (prefer lower hourly rate if enabled)

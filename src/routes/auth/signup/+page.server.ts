@@ -3,6 +3,9 @@ import type { Actions, PageServerLoad } from './$types';
 import { prisma } from '$lib/server/prisma';
 import bcrypt from 'bcryptjs';
 import { getSession } from '$lib/server/auth';
+import { sendVerificationEmail } from '$lib/server/email/send';
+import { PUBLIC_APP_URL } from '$env/static/public';
+import crypto from 'crypto';
 
 export const load: PageServerLoad = async (event) => {
 	const session = await getSession(event);
@@ -60,6 +63,10 @@ export const actions = {
 			// Hash password
 			const hashedPassword = await bcrypt.hash(password, 10);
 
+			// Generate verification token
+			const verificationToken = crypto.randomBytes(32).toString('hex');
+			const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
 			// Create organization and owner user in a transaction
 			const result = await prisma.$transaction(async (tx) => {
 				// Create organization
@@ -77,15 +84,29 @@ export const actions = {
 						name,
 						password: hashedPassword,
 						role: 'OWNER',
-						organizationId: organization.id
+						organizationId: organization.id,
+						emailVerified: false
+					}
+				});
+
+				// Create verification token
+				await tx.verificationToken.create({
+					data: {
+						identifier: email,
+						token: verificationToken,
+						expires: verificationExpires
 					}
 				});
 
 				return { organization, user };
 			});
 
-			// Redirect to login page with success message
-			throw redirect(303, '/auth/login?signup=success');
+			// Send verification email
+			const verificationUrl = `${PUBLIC_APP_URL}/auth/verify-email?token=${verificationToken}`;
+			await sendVerificationEmail(email, name, verificationUrl);
+
+			// Redirect to check email page
+			throw redirect(303, '/auth/check-email?email=' + encodeURIComponent(email));
 		} catch (error) {
 			console.error('Signup error:', error);
 			return fail(500, {

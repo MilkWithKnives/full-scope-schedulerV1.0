@@ -52,7 +52,18 @@ export const load: PageServerLoad = async (event) => {
 			id: true,
 			name: true,
 			role: true,
-			email: true
+			email: true,
+			phone: true,
+			defaultHourlyRate: true,
+			preferredLocationId: true,
+			maxHoursPerWeek: true,
+			minHoursPerWeek: true,
+			maxConsecutiveDays: true,
+			minRestHours: true,
+			seniority: true,
+			isFullTime: true,
+			skills: true,
+			shiftTypePreferences: true
 		},
 		orderBy: {
 			name: 'asc'
@@ -113,6 +124,18 @@ export const actions = {
 		const email = data.get('email') as string;
 		const role = data.get('role') as string;
 		const defaultHourlyRate = data.get('defaultHourlyRate') as string | null;
+		const phoneNumber = data.get('phoneNumber') as string | null;
+		const preferredLocationId = data.get('preferredLocationId') as string | null;
+
+		// Scheduling preferences
+		const maxHoursPerWeek = data.get('maxHoursPerWeek') as string | null;
+		const minHoursPerWeek = data.get('minHoursPerWeek') as string | null;
+		const maxConsecutiveDays = data.get('maxConsecutiveDays') as string | null;
+		const minRestHours = data.get('minRestHours') as string | null;
+		const seniority = data.get('seniority') as string | null;
+		const isFullTime = data.get('isFullTime') === 'true';
+		const skillsJson = data.get('skills') as string | null;
+		const shiftTypePreferencesJson = data.get('shiftTypePreferences') as string | null;
 
 		if (!name || !email || !role) {
 			return fail(400, { error: 'Missing required fields' });
@@ -134,7 +157,17 @@ export const actions = {
 					email,
 					role: role as 'OWNER' | 'MANAGER' | 'EMPLOYEE',
 					organizationId: session.user.organizationId,
-					defaultHourlyRate: defaultHourlyRate ? parseFloat(defaultHourlyRate) : null
+					phone: phoneNumber || null,
+					defaultHourlyRate: defaultHourlyRate ? parseFloat(defaultHourlyRate) : null,
+					preferredLocationId: preferredLocationId || null,
+					maxHoursPerWeek: maxHoursPerWeek ? parseInt(maxHoursPerWeek) : null,
+					minHoursPerWeek: minHoursPerWeek ? parseInt(minHoursPerWeek) : null,
+					maxConsecutiveDays: maxConsecutiveDays ? parseInt(maxConsecutiveDays) : null,
+					minRestHours: minRestHours ? parseInt(minRestHours) : null,
+					seniority: seniority ? parseInt(seniority) : null,
+					isFullTime,
+					skills: skillsJson ? JSON.parse(skillsJson) : [],
+					shiftTypePreferences: shiftTypePreferencesJson ? JSON.parse(shiftTypePreferencesJson) : []
 				}
 			});
 
@@ -155,6 +188,18 @@ export const actions = {
 		const name = data.get('name') as string;
 		const role = data.get('role') as string;
 		const defaultHourlyRate = data.get('defaultHourlyRate') as string | null;
+		const phoneNumber = data.get('phoneNumber') as string | null;
+		const preferredLocationId = data.get('preferredLocationId') as string | null;
+
+		// Scheduling preferences
+		const maxHoursPerWeek = data.get('maxHoursPerWeek') as string | null;
+		const minHoursPerWeek = data.get('minHoursPerWeek') as string | null;
+		const maxConsecutiveDays = data.get('maxConsecutiveDays') as string | null;
+		const minRestHours = data.get('minRestHours') as string | null;
+		const seniority = data.get('seniority') as string | null;
+		const isFullTime = data.get('isFullTime') === 'true';
+		const skillsJson = data.get('skills') as string | null;
+		const shiftTypePreferencesJson = data.get('shiftTypePreferences') as string | null;
 
 		if (!employeeId || !name || !role) {
 			return fail(400, { error: 'Missing required fields' });
@@ -178,7 +223,17 @@ export const actions = {
 				data: {
 					name,
 					role: role as 'OWNER' | 'MANAGER' | 'EMPLOYEE',
-					defaultHourlyRate: defaultHourlyRate ? parseFloat(defaultHourlyRate) : null
+					phone: phoneNumber || null,
+					defaultHourlyRate: defaultHourlyRate ? parseFloat(defaultHourlyRate) : null,
+					preferredLocationId: preferredLocationId || null,
+					maxHoursPerWeek: maxHoursPerWeek ? parseInt(maxHoursPerWeek) : null,
+					minHoursPerWeek: minHoursPerWeek ? parseInt(minHoursPerWeek) : null,
+					maxConsecutiveDays: maxConsecutiveDays ? parseInt(maxConsecutiveDays) : null,
+					minRestHours: minRestHours ? parseInt(minRestHours) : null,
+					seniority: seniority ? parseInt(seniority) : null,
+					isFullTime,
+					skills: skillsJson ? JSON.parse(skillsJson) : [],
+					shiftTypePreferences: shiftTypePreferencesJson ? JSON.parse(shiftTypePreferencesJson) : []
 				}
 			});
 

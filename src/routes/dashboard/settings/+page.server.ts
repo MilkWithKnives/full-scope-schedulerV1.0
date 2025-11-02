@@ -12,7 +12,8 @@ export const load: PageServerLoad = async (event) => {
 		include: {
 			locations: {
 				orderBy: { name: 'asc' }
-			}
+			},
+			schedulingPreferences: true
 		}
 	});
 
@@ -101,6 +102,58 @@ export const actions = {
 		} catch (error) {
 			console.error('Update profile error:', error);
 			return fail(500, { error: 'Failed to update profile' });
+		}
+	},
+
+	updateSchedulingPreferences: async (event) => {
+		const session = await requireRole(event, ['OWNER', 'MANAGER']);
+		const data = await event.request.formData();
+
+		// Global constraints
+		const defaultMaxHoursPerWeek = data.get('defaultMaxHoursPerWeek') as string;
+		const defaultMaxConsecutiveDays = data.get('defaultMaxConsecutiveDays') as string;
+		const defaultMinRestHours = data.get('defaultMinRestHours') as string;
+
+		// Algorithm settings
+		const preferredLocationWeight = data.get('preferredLocationWeight') as string;
+		const costOptimizationEnabled = data.get('costOptimizationEnabled') === 'true';
+		const fairDistributionEnabled = data.get('fairDistributionEnabled') === 'true';
+
+		// Auto-scheduling settings
+		const autoAssignEnabled = data.get('autoAssignEnabled') === 'true';
+		const minScoreThreshold = data.get('minScoreThreshold') as string;
+
+		try {
+			// Upsert scheduling preferences (create if doesn't exist, update if it does)
+			await prisma.schedulingPreferences.upsert({
+				where: { organizationId: session.user.organizationId },
+				create: {
+					organizationId: session.user.organizationId,
+					defaultMaxHoursPerWeek: defaultMaxHoursPerWeek ? parseInt(defaultMaxHoursPerWeek) : 40,
+					defaultMaxConsecutiveDays: defaultMaxConsecutiveDays ? parseInt(defaultMaxConsecutiveDays) : 6,
+					defaultMinRestHours: defaultMinRestHours ? parseInt(defaultMinRestHours) : 8,
+					preferredLocationWeight: preferredLocationWeight ? parseFloat(preferredLocationWeight) : 1.2,
+					costOptimizationEnabled,
+					fairDistributionEnabled,
+					autoAssignEnabled,
+					minScoreThreshold: minScoreThreshold ? parseInt(minScoreThreshold) : 60
+				},
+				update: {
+					defaultMaxHoursPerWeek: defaultMaxHoursPerWeek ? parseInt(defaultMaxHoursPerWeek) : 40,
+					defaultMaxConsecutiveDays: defaultMaxConsecutiveDays ? parseInt(defaultMaxConsecutiveDays) : 6,
+					defaultMinRestHours: defaultMinRestHours ? parseInt(defaultMinRestHours) : 8,
+					preferredLocationWeight: preferredLocationWeight ? parseFloat(preferredLocationWeight) : 1.2,
+					costOptimizationEnabled,
+					fairDistributionEnabled,
+					autoAssignEnabled,
+					minScoreThreshold: minScoreThreshold ? parseInt(minScoreThreshold) : 60
+				}
+			});
+
+			return { success: true, message: 'Scheduling preferences updated successfully' };
+		} catch (error) {
+			console.error('Update scheduling preferences error:', error);
+			return fail(500, { error: 'Failed to update scheduling preferences' });
 		}
 	}
 } satisfies Actions;

@@ -4,7 +4,60 @@
 
 @layer base {
 	body {
-		@apply bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100;
+		@apply bg-background text-foreground;
+	}
+  :root {
+		--background: 0 0% 100%;
+		--foreground: 224 71% 4%;
+		--card: 0 0% 100%;
+		--card-foreground: 224 71% 4%;
+		--popover: 0 0% 100%;
+		--popover-foreground: 224 71% 4%;
+		--primary: 263 70% 50%;
+		--primary-foreground: 0 0% 98%;
+		--secondary: 220 14% 96%;
+		--secondary-foreground: 220 9% 46%;
+		--muted: 220 14% 96%;
+		--muted-foreground: 220 9% 46%;
+		--accent: 220 14% 96%;
+		--accent-foreground: 220 9% 46%;
+		--destructive: 350 89% 60%;
+		--destructive-foreground: 0 0% 98%;
+		--border: 220 13% 91%;
+		--input: 220 13% 91%;
+		--ring: 263 70% 50%;
+		--chart-1: 263 70% 50%;
+		--chart-2: 142 76% 36%;
+		--chart-3: 48 96% 72%;
+		--chart-4: 350 89% 60%;
+		--chart-5: 220 9% 46%;
+		--radius: 0.5rem;
+	}
+  .dark {
+		--background: 224 71% 4%;
+		--foreground: 0 0% 98%;
+		--card: 224 71% 4%;
+		--card-foreground: 0 0% 98%;
+		--popover: 224 71% 4%;
+		--popover-foreground: 0 0% 98%;
+		--primary: 263 70% 50%;
+		--primary-foreground: 0 0% 98%;
+		--secondary: 215 28% 17%;
+		--secondary-foreground: 0 0% 98%;
+		--muted: 215 28% 17%;
+		--muted-foreground: 220 9% 46%;
+		--accent: 215 28% 17%;
+		--accent-foreground: 0 0% 98%;
+		--destructive: 350 89% 60%;
+		--destructive-foreground: 0 0% 98%;
+		--border: 215 28% 17%;
+		--input: 215 28% 17%;
+		--ring: 263 70% 50%;
+		--chart-1: 263 70% 50%;
+		--chart-2: 142 76% 36%;
+		--chart-3: 48 96% 72%;
+		--chart-4: 350 89% 60%;
+		--chart-5: 220 9% 46%;
 	}
 }
 
@@ -59,5 +112,16 @@
 	/* Smooth scrolling */
 	html {
 		scroll-behavior: smooth;
+	}
+}
+
+
+
+@layer base {
+  * {
+    @apply border-border;
+	}
+  body {
+    @apply bg-background text-foreground;
 	}
 }

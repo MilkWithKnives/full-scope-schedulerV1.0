@@ -99,6 +99,12 @@ export const actions = {
 		const notes = data.get('notes') as string | null;
 		const hourlyRate = data.get('hourlyRate') as string | null;
 
+		// Shift requirements
+		const requiredSkillsJson = data.get('requiredSkills') as string | null;
+		const shiftType = data.get('shiftType') as string | null;
+		const priority = data.get('priority') as string | null;
+		const minSeniority = data.get('minSeniority') as string | null;
+
 		if (!locationId || !role || !date || !startTime || !endTime) {
 			return fail(400, { error: 'Missing required fields' });
 		}
@@ -123,7 +129,11 @@ export const actions = {
 					breakMinutes: breakMinutes ? parseInt(breakMinutes) : 30,
 					notes: notes || null,
 					hourlyRate: hourlyRate ? parseFloat(hourlyRate) : null,
-					status: 'DRAFT'
+					status: 'DRAFT',
+					requiredSkills: requiredSkillsJson ? JSON.parse(requiredSkillsJson) : [],
+					shiftType: shiftType || null,
+					priority: priority ? parseInt(priority) : 0,
+					minSeniority: minSeniority ? parseInt(minSeniority) : null
 				},
 				include: {
 					user: {
@@ -168,6 +178,12 @@ export const actions = {
 		const notes = data.get('notes') as string | null;
 		const hourlyRate = data.get('hourlyRate') as string | null;
 
+		// Shift requirements
+		const requiredSkillsJson = data.get('requiredSkills') as string | null;
+		const shiftType = data.get('shiftType') as string | null;
+		const priority = data.get('priority') as string | null;
+		const minSeniority = data.get('minSeniority') as string | null;
+
 		if (!shiftId || !locationId || !role || !date || !startTime || !endTime) {
 			return fail(400, { error: 'Missing required fields' });
 		}
@@ -192,7 +208,11 @@ export const actions = {
 					endTime: endDateTime,
 					breakMinutes: breakMinutes ? parseInt(breakMinutes) : 30,
 					notes: notes || null,
-					hourlyRate: hourlyRate ? parseFloat(hourlyRate) : null
+					hourlyRate: hourlyRate ? parseFloat(hourlyRate) : null,
+					requiredSkills: requiredSkillsJson ? JSON.parse(requiredSkillsJson) : [],
+					shiftType: shiftType || null,
+					priority: priority ? parseInt(priority) : 0,
+					minSeniority: minSeniority ? parseInt(minSeniority) : null
 				},
 				include: {
 					user: {

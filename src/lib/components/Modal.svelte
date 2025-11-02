@@ -34,11 +34,13 @@
 <svelte:window onkeydown={handleEscape} />
 
 {#if open}
+	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 	<div
 		class="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4 overflow-y-auto"
 		onclick={handleBackdropClick}
 		role="dialog"
 		aria-modal="true"
+		tabindex="-1"
 	>
 		<div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full {sizeClasses[size]} my-8 animate-slide-up">
 			<!-- Header -->

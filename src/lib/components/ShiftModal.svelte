@@ -25,6 +25,13 @@
 	let breakMinutes = $state(shift?.breakMinutes || 30);
 	let hourlyRate = $state(shift?.hourlyRate || '');
 	let notes = $state(shift?.notes || '');
+
+	// Shift requirements
+	let requiredSkills = $state(shift?.requiredSkills || []);
+	let shiftType = $state(shift?.shiftType || '');
+	let priority = $state(shift?.priority || 0);
+	let minSeniority = $state(shift?.minSeniority || '');
+
 	let submitting = $state(false);
 
 	// Common restaurant roles
@@ -43,6 +50,36 @@
 		'Barback'
 	];
 
+	// Skill options (same as employee modal for consistency)
+	const skillOptions = [
+		'Server', 'Bartender', 'Host', 'Busser', 'Cook', 'Prep Cook',
+		'Line Cook', 'Dishwasher', 'Manager', 'Cash Handling', 'POS System',
+		'Food Safety Certified', 'Alcohol Service Certified'
+	];
+
+	// Shift type options
+	const shiftTypeOptions = [
+		{ value: '', label: 'Not specified' },
+		{ value: 'morning', label: 'Morning (6am-12pm)' },
+		{ value: 'afternoon', label: 'Afternoon (12pm-5pm)' },
+		{ value: 'evening', label: 'Evening (5pm-11pm)' },
+		{ value: 'overnight', label: 'Overnight (11pm-6am)' }
+	];
+
+	// Skill input
+	let newSkill = $state('');
+
+	function addSkill() {
+		if (newSkill.trim() && !requiredSkills.includes(newSkill.trim())) {
+			requiredSkills = [...requiredSkills, newSkill.trim()];
+			newSkill = '';
+		}
+	}
+
+	function removeSkill(skill: string) {
+		requiredSkills = requiredSkills.filter(s => s !== skill);
+	}
+
 	async function handleSubmit(e: Event) {
 		e.preventDefault();
 		submitting = true;
@@ -58,6 +95,12 @@
 		formData.append('breakMinutes', breakMinutes.toString());
 		if (hourlyRate) formData.append('hourlyRate', hourlyRate.toString());
 		if (notes) formData.append('notes', notes);
+
+		// Shift requirements
+		formData.append('requiredSkills', JSON.stringify(requiredSkills));
+		if (shiftType) formData.append('shiftType', shiftType);
+		formData.append('priority', priority.toString());
+		if (minSeniority) formData.append('minSeniority', minSeniority.toString());
 
 		try {
 			const action = shift?.id ? '?/updateShift' : '?/createShift';
@@ -117,6 +160,10 @@
 					userId = '';
 					role = '';
 					notes = '';
+					requiredSkills = [];
+					shiftType = '';
+					priority = 0;
+					minSeniority = '';
 				}
 			}, 300);
 		}
@@ -259,6 +306,130 @@
 							placeholder="Uses employee's default rate"
 							class="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
 						/>
+					</div>
+				</div>
+
+				<!-- Shift Requirements Section -->
+				<div class="border-t border-slate-200 dark:border-slate-700 pt-6">
+					<div class="flex items-center gap-2 mb-4">
+						<svg class="w-5 h-5 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+						</svg>
+						<h3 class="text-lg font-semibold text-slate-900 dark:text-white">
+							Shift Requirements
+						</h3>
+					</div>
+					<p class="text-sm text-slate-600 dark:text-slate-400 mb-6">
+						Help the auto-scheduler find the right person for this shift
+					</p>
+
+					<!-- Required Skills -->
+					<div class="mb-6">
+						<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+							Required Skills
+						</label>
+						<div class="space-y-3">
+							<!-- Skill Tags -->
+							{#if requiredSkills.length > 0}
+								<div class="flex flex-wrap gap-2">
+									{#each requiredSkills as skill}
+										<span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-full text-sm font-medium">
+											{skill}
+											<button
+												type="button"
+												onclick={() => removeSkill(skill)}
+												class="hover:bg-primary-200 dark:hover:bg-primary-800/50 rounded-full p-0.5 transition-colors"
+												aria-label="Remove {skill}"
+											>
+												<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+												</svg>
+											</button>
+										</span>
+									{/each}
+								</div>
+							{/if}
+
+							<!-- Add Skill Input -->
+							<div class="flex gap-2">
+								<input
+									type="text"
+									bind:value={newSkill}
+									placeholder="Add required skill"
+									class="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+									onkeydown={(e) => e.key === 'Enter' && (e.preventDefault(), addSkill())}
+								/>
+								<button
+									type="button"
+									onclick={addSkill}
+									class="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors font-medium"
+								>
+									Add
+								</button>
+							</div>
+
+							<!-- Quick Add Skills -->
+							<div class="flex flex-wrap gap-2">
+								{#each skillOptions.filter(s => !requiredSkills.includes(s)) as skillOption}
+									<button
+										type="button"
+										onclick={() => requiredSkills = [...requiredSkills, skillOption]}
+										class="px-3 py-1 text-xs bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700"
+									>
+										+ {skillOption}
+									</button>
+								{/each}
+							</div>
+						</div>
+					</div>
+
+					<!-- Shift Type, Priority, Min Seniority -->
+					<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+						<div>
+							<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+								Shift Type
+							</label>
+							<select
+								bind:value={shiftType}
+								class="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+							>
+								{#each shiftTypeOptions as option}
+									<option value={option.value}>{option.label}</option>
+								{/each}
+							</select>
+						</div>
+
+						<div>
+							<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+								Priority (0-10)
+							</label>
+							<input
+								type="range"
+								bind:value={priority}
+								min="0"
+								max="10"
+								class="w-full"
+							/>
+							<div class="flex justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
+								<span>Low</span>
+								<span class="font-medium text-slate-700 dark:text-slate-300">{priority}</span>
+								<span>High</span>
+							</div>
+						</div>
+
+						<div>
+							<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+								Min Seniority (Years)
+							</label>
+							<input
+								type="number"
+								bind:value={minSeniority}
+								min="0"
+								max="50"
+								placeholder="0"
+								class="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+							/>
+						</div>
 					</div>
 				</div>
 

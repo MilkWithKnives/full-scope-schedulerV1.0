@@ -200,7 +200,7 @@
 						{userLocation ? 'Location detected' : locationError || 'We need your location'}
 					</div>
 					<div class="text-sm text-slate-600 dark:text-slate-400">
-						{userLocation ? 'Get near your shift to clock in' : 'We use this to verify you're at work'}
+						{userLocation ? 'Get near your shift to clock in' : "We use this to verify you're at work"}
 					</div>
 				</div>
 			</div>

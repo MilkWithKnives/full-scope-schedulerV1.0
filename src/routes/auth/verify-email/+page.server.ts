@@ -2,7 +2,7 @@ import { redirect, error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { prisma } from '$lib/server/prisma';
 import { sendWelcomeEmail } from '$lib/server/email/send';
-import { PUBLIC_APP_URL } from '$env/static/public';
+import { PUBLIC_APP_URL } from '$env/static/private';
 
 export const load: PageServerLoad = async ({ url }) => {
 	const token = url.searchParams.get('token');

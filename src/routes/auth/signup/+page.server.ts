@@ -4,7 +4,7 @@ import { prisma } from '$lib/server/prisma';
 import bcrypt from 'bcryptjs';
 import { getSession } from '$lib/server/auth';
 import { sendVerificationEmail } from '$lib/server/email/send';
-import { PUBLIC_APP_URL } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 import crypto from 'crypto';
 
 export const load: PageServerLoad = async (event) => {
@@ -102,7 +102,7 @@ export const actions = {
 			});
 
 			// Send verification email
-			const verificationUrl = `${PUBLIC_APP_URL}/auth/verify-email?token=${verificationToken}`;
+			const verificationUrl = `${env.PUBLIC_APP_URL}/auth/verify-email?token=${verificationToken}`;
 			await sendVerificationEmail(email, name, verificationUrl);
 
 			// Redirect to check email page

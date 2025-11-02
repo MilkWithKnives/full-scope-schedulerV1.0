@@ -2,7 +2,7 @@ import { redirect, error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { prisma } from '$lib/server/prisma';
 import { sendWelcomeEmail } from '$lib/server/email/send';
-import { PUBLIC_APP_URL } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 
 export const load: PageServerLoad = async ({ url }) => {
 	const token = url.searchParams.get('token');
@@ -50,7 +50,7 @@ export const load: PageServerLoad = async ({ url }) => {
 	});
 
 	// Send welcome email
-	await sendWelcomeEmail(user.email, user.name, `${PUBLIC_APP_URL}/dashboard`);
+	await sendWelcomeEmail(user.email, user.name, `${env.PUBLIC_APP_URL}/dashboard`);
 
 	// Redirect to login with success message
 	throw redirect(303, '/auth/login?verified=true');

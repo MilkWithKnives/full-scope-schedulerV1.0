@@ -1,8 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { ANTHROPIC_API_KEY } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 
 const anthropic = new Anthropic({
-	apiKey: ANTHROPIC_API_KEY
+	apiKey: env.ANTHROPIC_API_KEY
 });
 
 interface SchedulingContext {

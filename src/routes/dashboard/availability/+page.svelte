@@ -19,7 +19,7 @@
 	let clearing = $state<number | null>(null);
 
 	// Group availability by day
-	const availabilityByDay = $derived(() => {
+	const availabilityByDay = $derived.by(() => {
 		const grouped: Record<number, typeof data.availability> = {};
 		for (let i = 0; i < 7; i++) {
 			grouped[i] = [];
@@ -32,14 +32,14 @@
 
 	// Check if a time slot is available
 	function hasAvailability(dayOfWeek: number, startTime: string, endTime: string): boolean {
-		return availabilityByDay()[dayOfWeek].some(
+		return availabilityByDay[dayOfWeek].some(
 			avail => avail.startTime === startTime && avail.endTime === endTime
 		);
 	}
 
 	// Get availability ID for a slot
 	function getAvailabilityId(dayOfWeek: number, startTime: string, endTime: string): string | null {
-		const avail = availabilityByDay()[dayOfWeek].find(
+		const avail = availabilityByDay[dayOfWeek].find(
 			a => a.startTime === startTime && a.endTime === endTime
 		);
 		return avail?.id || null;
@@ -109,7 +109,7 @@
 
 	// Clear entire day
 	async function clearDay(dayOfWeek: number) {
-		if (availabilityByDay()[dayOfWeek].length === 0) return;
+		if (availabilityByDay[dayOfWeek].length === 0) return;
 
 		clearing = dayOfWeek;
 
@@ -167,7 +167,7 @@
 	<div class="card p-6">
 		<div class="space-y-6">
 			{#each daysOfWeek as day, dayIndex}
-				{@const dayAvailability = availabilityByDay()[dayIndex]}
+				{@const dayAvailability = availabilityByDay[dayIndex]}
 				{@const hasAny = dayAvailability.length > 0}
 
 				<div>
@@ -230,7 +230,7 @@
 			<h3 class="font-bold text-slate-900 dark:text-white mb-3">Your Availability Summary</h3>
 			<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
 				{#each daysOfWeek as day, dayIndex}
-					{@const count = availabilityByDay()[dayIndex].length}
+					{@const count = availabilityByDay[dayIndex].length}
 					{#if count > 0}
 						<div class="text-center p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
 							<div class="text-2xl font-bold text-primary-500">{count}</div>

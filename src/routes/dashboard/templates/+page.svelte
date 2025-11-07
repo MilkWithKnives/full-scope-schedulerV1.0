@@ -2,13 +2,14 @@
 	import type { PageData } from './$types';
 	import Button from '$lib/components/Button.svelte';
 	import { toast } from 'svelte-sonner';
+	import { SvelteSet } from 'svelte/reactivity';
 
 	let { data }: { data: PageData } = $props();
 
 	let showTemplateModal = $state(false);
 	let selectedTemplate = $state<any | null>(null);
 	let showApplyModal = $state(false);
-	let selectedTemplates = $state<Set<string>>(new Set());
+	let selectedTemplates = $state(new SvelteSet<string>());
 	let weekStart = $state(new Date().toISOString().split('T')[0]);
 
 	const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -53,7 +54,7 @@
 		} else {
 			selectedTemplates.add(templateId);
 		}
-		selectedTemplates = new Set(selectedTemplates);
+		selectedTemplates = new SvelteSet(selectedTemplates);
 	}
 
 	async function handleApplyTemplates() {
@@ -77,7 +78,7 @@
 			if (result.type === 'success') {
 				toast.success(`Created ${result.data?.count} shifts from templates!`);
 				showApplyModal = false;
-				selectedTemplates = new Set();
+				selectedTemplates = new SvelteSet();
 			} else {
 				toast.error(result.data?.error || 'Failed to apply templates');
 			}
@@ -88,7 +89,7 @@
 	}
 
 	// Group templates by day of week
-	const templatesByDay = $derived(() => {
+	const templatesByDay = $derived.by(() => {
 		const grouped: Record<number, typeof data.templates> = {};
 		for (let i = 0; i < 7; i++) {
 			grouped[i] = [];
@@ -126,7 +127,7 @@
 
 	<!-- Templates by Day -->
 	{#each [1, 2, 3, 4, 5, 6, 0] as dayIndex}
-		{@const dayTemplates = templatesByDay()[dayIndex]}
+		{@const dayTemplates = templatesByDay[dayIndex]}
 		<div class="card p-6">
 			<h2 class="text-xl font-bold text-slate-900 dark:text-white mb-4">
 				{dayNames[dayIndex]} ({dayTemplates.length})
@@ -386,7 +387,7 @@
 					type="button"
 					onclick={() => {
 						showApplyModal = false;
-						selectedTemplates = new Set();
+						selectedTemplates = new SvelteSet();
 					}}
 					class="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 text-2xl"
 				>
@@ -418,9 +419,9 @@
 							onclick={() => {
 								const active = data.templates.filter((t) => t.isActive);
 								if (selectedTemplates.size === active.length) {
-									selectedTemplates = new Set();
+									selectedTemplates = new SvelteSet();
 								} else {
-									selectedTemplates = new Set(active.map((t) => t.id));
+									selectedTemplates = new SvelteSet(active.map((t) => t.id));
 								}
 							}}
 							class="text-sm text-primary-600 dark:text-primary-400 hover:underline"
@@ -465,7 +466,7 @@
 						variant="ghost"
 						onclick={() => {
 							showApplyModal = false;
-							selectedTemplates = new Set();
+							selectedTemplates = new SvelteSet();
 						}}
 					>
 						Cancel

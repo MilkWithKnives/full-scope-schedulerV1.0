@@ -63,11 +63,11 @@
 
 @layer components {
 	.btn {
-		@apply px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2;
+		@apply px-4 py-2 font-medium transition-all duration-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2;
 	}
 
 	.btn-primary {
-		@apply bg-primary-500 text-white hover:bg-primary-600 focus:ring-primary-500;
+		@apply text-white bg-primary-500 hover:bg-primary-600 focus:ring-primary-500;
 	}
 
 	.btn-secondary {
@@ -79,7 +79,7 @@
 	}
 
 	.input {
-		@apply w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all;
+		@apply w-full px-4 py-2 transition-all bg-white border rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
 	}
 
 	.input-error {
@@ -87,12 +87,12 @@
 	}
 
 	.card {
-		@apply bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200;
+		@apply transition-shadow duration-200 bg-white border shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-xl hover:shadow-md;
 	}
 
 	/* Softer, more elevated shadows */
 	.card-elevated {
-		@apply card shadow-md hover:shadow-lg;
+		@apply shadow-md card hover:shadow-lg;
 	}
 
 	/* Smooth transitions */

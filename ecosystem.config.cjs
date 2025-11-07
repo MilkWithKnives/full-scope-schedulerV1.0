@@ -8,7 +8,7 @@ module.exports = {
 			env: {
 				NODE_ENV: 'production',
 				PORT: 3000,
-				ORIGIN: 'https://yourdomain.com' // Update this to your actual domain
+				ORIGIN: 'https://roster86.com'
 			},
 			// Automatic restart configuration
 			autorestart: true,

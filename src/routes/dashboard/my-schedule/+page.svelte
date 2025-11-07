@@ -15,7 +15,7 @@
 	let clockingOut = $state(false);
 
 	// Calculate elapsed time for active shift
-	const elapsedTime = $derived(() => {
+	const elapsedTime = $derived.by(() => {
 		if (!data.activeTimeEntry) return null;
 		const now = new Date();
 		const clockIn = new Date(data.activeTimeEntry.clockIn);
@@ -139,6 +139,41 @@
 		}
 	}
 
+	// Drop shift
+	let droppingShift = $state<string | null>(null);
+
+	async function handleDropShift(shiftId: string) {
+		if (!confirm('Are you sure you want to drop this shift? It will become available for other servers to claim.')) {
+			return;
+		}
+
+		droppingShift = shiftId;
+
+		try {
+			const formData = new FormData();
+			formData.append('shiftId', shiftId);
+
+			const response = await fetch('?/dropShift', {
+				method: 'POST',
+				body: formData
+			});
+
+			const result = await response.json();
+
+			if (response.ok) {
+				toast.success('Shift dropped and is now available for others');
+				window.location.reload();
+			} else {
+				toast.error(result.error || 'Failed to drop shift');
+			}
+		} catch (error) {
+			console.error('Drop shift error:', error);
+			toast.error('Something went wrong');
+		} finally {
+			droppingShift = null;
+		}
+	}
+
 	// Auto-check location on mount
 	$effect(() => {
 		checkUserLocation();
@@ -173,7 +208,7 @@
 				<div class="text-right">
 					<div class="text-sm text-slate-600 dark:text-slate-400">Time Elapsed</div>
 					<div class="text-xl font-bold text-green-600 dark:text-green-400">
-						{elapsedTime()}
+						{elapsedTime}
 					</div>
 				</div>
 			</div>
@@ -286,7 +321,7 @@
 				{#each data.upcomingShifts.slice(data.todayShifts.length, data.todayShifts.length + 5) as shift}
 					<div class="card p-4">
 						<div class="flex items-center justify-between">
-							<div class="flex items-center gap-3">
+							<div class="flex items-center gap-3 flex-1">
 								<div class="text-center">
 									<div class="text-xs text-slate-500 dark:text-slate-400">
 										{formatDayOfWeek(new Date(shift.startTime))}
@@ -297,15 +332,27 @@
 								</div>
 								<div>
 									<div class="font-medium text-slate-900 dark:text-white">
-										{shift.location.name}
+										{shift.Location.name}
 									</div>
 									<div class="text-sm text-slate-600 dark:text-slate-400">
 										{formatTime(shift.startTime)} - {formatTime(shift.endTime)} • {shift.role}
 									</div>
 								</div>
 							</div>
-							<div class="text-xs px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
-								{shift.status}
+							<div class="flex items-center gap-2">
+								<div class="text-xs px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
+									{shift.status}
+								</div>
+								{#if new Date(shift.startTime) > new Date()}
+									<Button
+										variant="ghost"
+										size="sm"
+										onclick={() => handleDropShift(shift.id)}
+										loading={droppingShift === shift.id}
+									>
+										{droppingShift === shift.id ? 'Dropping...' : 'Drop'}
+									</Button>
+								{/if}
 							</div>
 						</div>
 					</div>

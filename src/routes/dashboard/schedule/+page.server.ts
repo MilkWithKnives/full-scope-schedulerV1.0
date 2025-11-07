@@ -44,7 +44,7 @@ export const load: PageServerLoad = async (event) => {
 
 	const shifts = await prisma.shift.findMany({
 		where: {
-			location: {
+			Location: {
 				organizationId: session.user.organizationId
 			},
 			startTime: {
@@ -53,14 +53,14 @@ export const load: PageServerLoad = async (event) => {
 			}
 		},
 		include: {
-			user: {
+			User: {
 				select: {
 					id: true,
 					name: true,
 					email: true
 				}
 			},
-			location: {
+			Location: {
 				select: {
 					id: true,
 					name: true
@@ -72,10 +72,17 @@ export const load: PageServerLoad = async (event) => {
 		}
 	});
 
+	// Map included relations to lowercase keys for frontend compatibility
+	const mappedShifts = shifts.map((shift) => ({
+		...shift,
+		user: shift.User,
+		location: shift.Location
+	}));
+
 	return {
 		locations,
 		users,
-		shifts,
+		shifts: mappedShifts,
 		weekStart: weekStart.toISOString(),
 		weekEnd: weekEnd.toISOString()
 	};
@@ -121,6 +128,7 @@ export const actions = {
 
 			const shift = await prisma.shift.create({
 				data: {
+					id: crypto.randomUUID(),
 					locationId,
 					userId: userId || null,
 					role,
@@ -136,7 +144,7 @@ export const actions = {
 					minSeniority: minSeniority ? parseInt(minSeniority) : null
 				},
 				include: {
-					user: {
+					User: {
 						select: {
 							id: true,
 							name: true,
@@ -144,7 +152,7 @@ export const actions = {
 							defaultHourlyRate: true
 						}
 					},
-					location: {
+					Location: {
 						select: {
 							id: true,
 							name: true
@@ -215,7 +223,7 @@ export const actions = {
 					minSeniority: minSeniority ? parseInt(minSeniority) : null
 				},
 				include: {
-					user: {
+					User: {
 						select: {
 							id: true,
 							name: true,
@@ -223,7 +231,7 @@ export const actions = {
 							defaultHourlyRate: true
 						}
 					},
-					location: {
+					Location: {
 						select: {
 							id: true,
 							name: true

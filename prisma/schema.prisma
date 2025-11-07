@@ -1,5 +1,3 @@
-// This is your Prisma schema file
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,107 +7,256 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Availability {
+  id           String    @id
+  userId       String
+  dayOfWeek    Int
+  startTime    String
+  endTime      String
+  createdAt    DateTime  @default(now())
+  isRecurring  Boolean   @default(true)
+  specificDate DateTime?
+  isPreferred  Boolean   @default(false)
+  updatedAt    DateTime  @default(now())
+  User         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, dayOfWeek])
+}
+
+model Location {
+  id             String       @id
+  name           String
+  address        String
+  organizationId String
+  createdAt      DateTime     @default(now())
+  latitude       Float?
+  longitude      Float?
+  geofenceRadius Int?         @default(250)
+  Organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  Shift          Shift[]
+  TimeEntry      TimeEntry[]
+  User           User[]
+}
+
 model Organization {
-  id                     String                   @id @default(cuid())
-  name                   String
-  plan                   String                   @default("free")
-  timezone               String?                  @default("America/New_York")
-  logoUrl                String?
-  onboardingCompleted    Boolean                  @default(false)
-  locations              Location[]
-  users                  User[]
-  schedulingPreferences  SchedulingPreferences?
-  createdAt              DateTime                 @default(now())
-  updatedAt              DateTime                 @default(now()) @updatedAt
+  id                          String                 @id
+  name                        String
+  plan                        String                 @default("free")
+  createdAt                   DateTime               @default(now())
+  logoUrl                     String?
+  onboardingCompleted         Boolean                @default(false)
+  timezone                    String?                @default("America/New_York")
+  updatedAt                   DateTime               @default(now())
+  autoEndBeforeOvertime       Boolean                @default(false)
+  breakPaid                   Boolean                @default(false)
+  breaksEnabled               Boolean                @default(true)
+  coworkersVisibleToEmployees Boolean                @default(true)
+  defaultBreakMinutes         Int                    @default(30)
+  earlyClockInMinutes         Int                    @default(15)
+  employeesCanRequestTimeOff  Boolean                @default(true)
+  employeesCanSwapShifts      Boolean                @default(true)
+  employeesCanViewCoworkers   Boolean                @default(true)
+  firstDayOfWeek              Int                    @default(1)
+  geofencingEnabled           Boolean                @default(true)
+  hoursOfOperationEnd         String                 @default("23:59")
+  hoursOfOperationStart       String                 @default("00:00")
+  lateClockInMinutes          Int                    @default(15)
+  managersCanEditAllLocations Boolean                @default(false)
+  overtimeThreshold           Int                    @default(40)
+  roundingEnabled             Boolean                @default(false)
+  roundingMinutes             Int                    @default(15)
+  scheduleVisibleToEmployees  Boolean                @default(true)
+  scheduleVisibleToManagers   Boolean                @default(true)
+  swapRequiresApproval        Boolean                @default(false)
+  timeClockEnabled            Boolean                @default(true)
+  timeOffVisibleToEmployees   Boolean                @default(true)
+  Location                    Location[]
+  SchedulingPreferences       SchedulingPreferences?
+  User                        User[]
+}
+
+model SchedulingPreferences {
+  id                        String       @id
+  organizationId            String       @unique
+  defaultMaxHoursPerWeek    Int          @default(40)
+  defaultMaxConsecutiveDays Int          @default(6)
+  defaultMinRestHours       Int          @default(8)
+  preferredLocationWeight   Float        @default(1.2)
+  costOptimizationEnabled   Boolean      @default(true)
+  fairDistributionEnabled   Boolean      @default(true)
+  autoAssignEnabled         Boolean      @default(false)
+  minScoreThreshold         Int          @default(60)
+  createdAt                 DateTime     @default(now())
+  updatedAt                 DateTime
+  Organization              Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model Shift {
+  id                                                   String             @id
+  startTime                                            DateTime
+  endTime                                              DateTime
+  userId                                               String?
+  locationId                                           String
+  role                                                 String
+  status                                               ShiftStatus        @default(DRAFT)
+  notes                                                String?
+  createdAt                                            DateTime           @default(now())
+  updatedAt                                            DateTime
+  breakMinutes                                         Int                @default(30)
+  hourlyRate                                           Float?
+  minSeniority                                         Int?
+  priority                                             Int                @default(0)
+  requiredSkills                                       String[]           @default([])
+  shiftType                                            String?
+  Location                                             Location           @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  User                                                 User?              @relation(fields: [userId], references: [id])
+  ShiftSwapRequest_ShiftSwapRequest_fromShiftIdToShift ShiftSwapRequest[] @relation("ShiftSwapRequest_fromShiftIdToShift")
+  ShiftSwapRequest_ShiftSwapRequest_toShiftIdToShift   ShiftSwapRequest[] @relation("ShiftSwapRequest_toShiftIdToShift")
+  TimeEntry                                            TimeEntry[]
+  TipRecord                                            TipRecord[]
+}
+
+model ShiftSwapRequest {
+  id                                        String     @id
+  fromShiftId                               String
+  toShiftId                                 String
+  requestedById                             String
+  status                                    SwapStatus @default(PENDING)
+  autoApproved                              Boolean    @default(false)
+  reason                                    String?
+  createdAt                                 DateTime   @default(now())
+  updatedAt                                 DateTime
+  Shift_ShiftSwapRequest_fromShiftIdToShift Shift      @relation("ShiftSwapRequest_fromShiftIdToShift", fields: [fromShiftId], references: [id], onDelete: Cascade)
+  User                                      User       @relation(fields: [requestedById], references: [id], onDelete: Cascade)
+  Shift_ShiftSwapRequest_toShiftIdToShift   Shift      @relation("ShiftSwapRequest_toShiftIdToShift", fields: [toShiftId], references: [id], onDelete: Cascade)
+}
+
+model ShiftTemplate {
+  id             String   @id
+  organizationId String
+  name           String
+  dayOfWeek      Int
+  startTime      String
+  endTime        String
+  role           String
+  locationId     String?
+  breakMinutes   Int      @default(30)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+}
+
+model TimeEntry {
+  id         String    @id
+  userId     String
+  shiftId    String?
+  clockIn    DateTime
+  clockOut   DateTime?
+  clockInLat Float?
+  clockInLng Float?
+  locationId String
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime
+  Location   Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  Shift      Shift?    @relation(fields: [shiftId], references: [id])
+  User       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TimeOffRequest {
+  id                                   String        @id
+  userId                               String
+  startDate                            DateTime
+  endDate                              DateTime
+  reason                               String?
+  status                               TimeOffStatus @default(PENDING)
+  reviewedBy                           String?
+  createdAt                            DateTime      @default(now())
+  updatedAt                            DateTime
+  User_TimeOffRequest_reviewedByToUser User?         @relation("TimeOffRequest_reviewedByToUser", fields: [reviewedBy], references: [id])
+  User_TimeOffRequest_userIdToUser     User          @relation("TimeOffRequest_userIdToUser", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TipRecord {
+  id        String   @id
+  userId    String
+  shiftId   String?
+  amount    Float
+  date      DateTime
+  createdAt DateTime @default(now())
+  Shift     Shift?   @relation(fields: [shiftId], references: [id])
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UnavailableDate {
+  id        String   @id
+  userId    String
+  date      DateTime
+  allDay    Boolean  @default(true)
+  startTime String?
+  endTime   String?
+  reason    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
 }
 
 model User {
-  id                     String             @id @default(cuid())
-  email                  String             @unique
-  emailVerified          Boolean            @default(false)
-  name                   String
-  password               String?            // Null for magic-link only users
-  phone                  String?
-  phoneVerified          Boolean            @default(false)
-  timezone               String?            @default("America/New_York")
-  profilePicture         String?
-  role                   Role               @default(EMPLOYEE)
-  position               String?            // Job title
-  hireDate               DateTime?
-  organizationId         String
-  organization           Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  id                                             String             @id
+  email                                          String             @unique
+  name                                           String
+  password                                       String?
+  role                                           Role               @default(EMPLOYEE)
+  organizationId                                 String
+  createdAt                                      DateTime           @default(now())
+  updatedAt                                      DateTime
+  defaultHourlyRate                              Float?
+  emailVerified                                  Boolean            @default(false)
+  hireDate                                       DateTime?
+  maxHoursPerWeek                                Int?
+  phone                                          String?
+  phoneVerified                                  Boolean            @default(false)
+  position                                       String?
+  profilePicture                                 String?
+  timezone                                       String?            @default("America/New_York")
+  isFullTime                                     Boolean            @default(false)
+  maxConsecutiveDays                             Int?               @default(6)
+  minHoursPerWeek                                Int?
+  minRestHours                                   Int?               @default(8)
+  preferredLocationId                            String?
+  seniority                                      Int?               @default(0)
+  shiftTypePreferences                           String[]           @default([])
+  skills                                         String[]           @default([])
+  emailNotifications                             Boolean            @default(true)
+  schedulePublishedNotifications                 Boolean            @default(true)
+  shiftReminderHours                             Int                @default(24)
+  smsNotifications                               Boolean            @default(false)
+  swapRequestNotifications                       Boolean            @default(true)
+  Availability                                   Availability[]
+  Shift                                          Shift[]
+  ShiftSwapRequest                               ShiftSwapRequest[]
+  TimeEntry                                      TimeEntry[]
+  TimeOffRequest_TimeOffRequest_reviewedByToUser TimeOffRequest[]   @relation("TimeOffRequest_reviewedByToUser")
+  TimeOffRequest_TimeOffRequest_userIdToUser     TimeOffRequest[]   @relation("TimeOffRequest_userIdToUser")
+  TipRecord                                      TipRecord[]
+  UnavailableDate                                UnavailableDate[]
+  Organization                                   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  Location                                       Location?          @relation(fields: [preferredLocationId], references: [id])
+}
 
-  // Scheduling preferences
-  preferredLocationId    String?
-  preferredLocation      Location?          @relation("PreferredLocation", fields: [preferredLocationId], references: [id], onDelete: SetNull)
-  defaultHourlyRate      Float?             // Default pay rate for labor cost
-  maxHoursPerWeek        Int?               // Maximum hours willing to work per week
-  minHoursPerWeek        Int?               // Minimum hours needed per week
-  maxConsecutiveDays     Int?               @default(6) // Maximum consecutive work days
-  minRestHours           Int?               @default(8) // Minimum rest hours between shifts
-  skills                 String[]           @default([]) // Skills/certifications (e.g., ["bartender", "server"])
-  shiftTypePreferences   String[]           @default([]) // Preferred shift types (e.g., ["morning", "evening"])
-  seniority              Int?               @default(0) // Years of experience
-  isFullTime             Boolean            @default(false)
+model verification_tokens {
+  identifier String
+  token      String   @unique
+  expires    DateTime
 
-  shifts                 Shift[]
-  availability           Availability[]
-  unavailableDates       UnavailableDate[]
-  swapRequests           ShiftSwapRequest[] @relation("SwapRequester")
-  timeEntries            TimeEntry[]
-  tipRecords             TipRecord[]
-  timeOffRequests        TimeOffRequest[]
-  timeOffReviewsApproved TimeOffRequest[]   @relation("TimeOffReviewer")
-  createdAt              DateTime           @default(now())
-  updatedAt              DateTime           @updatedAt
+  @@unique([identifier, token])
 }
 
 enum Role {
   OWNER
   MANAGER
   EMPLOYEE
-}
-
-model Location {
-  id                String       @id @default(cuid())
-  name              String
-  address           String
-  latitude          Float?       // For GPS geofencing
-  longitude         Float?
-  organizationId    String
-  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  shifts            Shift[]
-  timeEntries       TimeEntry[]
-  preferredByUsers  User[]       @relation("PreferredLocation")
-  createdAt         DateTime     @default(now())
-}
-
-model Shift {
-  id               String             @id @default(cuid())
-  startTime        DateTime
-  endTime          DateTime
-  userId           String?
-  user             User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
-  locationId       String
-  location         Location           @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  role             String
-  status           ShiftStatus        @default(DRAFT)
-  notes            String?
-  breakMinutes     Int                @default(30) // Unpaid break time
-  hourlyRate       Float?             // For labor cost calculation
-
-  // Scheduling requirements
-  requiredSkills   String[]           @default([]) // Skills needed for this shift
-  shiftType        String?            // morning/afternoon/evening/overnight
-  priority         Int                @default(0) // 0-10, higher = more important
-  minSeniority     Int?               // Minimum years of experience required
-
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  swapRequestsFrom ShiftSwapRequest[] @relation("FromShift")
-  swapRequestsTo   ShiftSwapRequest[] @relation("ToShift")
-  timeEntries      TimeEntry[]
-  tipRecords       TipRecord[]
 }
 
 enum ShiftStatus {
@@ -119,37 +266,6 @@ enum ShiftStatus {
   CANCELLED
 }
 
-model Availability {
-  id           String    @id @default(cuid())
-  userId       String
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  dayOfWeek    Int       // 0-6 (Sunday-Saturday)
-  startTime    String    // HH:MM format
-  endTime      String    // HH:MM format
-  isRecurring  Boolean   @default(true) // Weekly recurring or one-time
-  isPreferred  Boolean   @default(false) // Preferred vs just available
-  specificDate DateTime? // For one-time availability overrides
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @default(now()) @updatedAt
-
-  @@index([userId, dayOfWeek])
-}
-
-model ShiftSwapRequest {
-  id            String     @id @default(cuid())
-  fromShiftId   String
-  fromShift     Shift      @relation("FromShift", fields: [fromShiftId], references: [id], onDelete: Cascade)
-  toShiftId     String
-  toShift       Shift      @relation("ToShift", fields: [toShiftId], references: [id], onDelete: Cascade)
-  requestedById String
-  requestedBy   User       @relation("SwapRequester", fields: [requestedById], references: [id], onDelete: Cascade)
-  status        SwapStatus @default(PENDING)
-  autoApproved  Boolean    @default(false) // True if swap was auto-approved (no conflicts)
-  reason        String?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-}
-
 enum SwapStatus {
   PENDING
   APPROVED
@@ -157,111 +273,8 @@ enum SwapStatus {
   CANCELLED
 }
 
-model ShiftTemplate {
-  id             String   @id @default(cuid())
-  organizationId String
-  name           String   // e.g., "Morning Server Shift"
-  dayOfWeek      Int      // 0-6 (Sunday-Saturday)
-  startTime      String   // HH:MM format
-  endTime        String   // HH:MM format
-  role           String
-  locationId     String?
-  breakMinutes   Int      @default(30)
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-}
-
-model TimeEntry {
-  id         String    @id @default(cuid())
-  userId     String
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  shiftId    String?
-  shift      Shift?    @relation(fields: [shiftId], references: [id], onDelete: SetNull)
-  clockIn    DateTime
-  clockOut   DateTime?
-  clockInLat Float? // GPS coordinates for clock-in verification
-  clockInLng Float?
-  locationId String
-  location   Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  notes      String?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-}
-
-model TipRecord {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  shiftId   String?
-  shift     Shift?   @relation(fields: [shiftId], references: [id], onDelete: SetNull)
-  amount    Float // Credit card tips only
-  date      DateTime
-  createdAt DateTime @default(now())
-}
-
-model TimeOffRequest {
-  id         String           @id @default(cuid())
-  userId     String
-  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  startDate  DateTime
-  endDate    DateTime
-  reason     String?
-  status     TimeOffStatus    @default(PENDING)
-  reviewedBy String?
-  reviewer   User?            @relation("TimeOffReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
-  createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
-}
-
 enum TimeOffStatus {
   PENDING
   APPROVED
   DENIED
-}
-
-model UnavailableDate {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  date      DateTime
-  allDay    Boolean  @default(true)
-  startTime String?  // If not all day
-  endTime   String?  // If not all day
-  reason    String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId, date])
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-  @@map("verification_tokens")
-}
-
-model SchedulingPreferences {
-  id                        String       @id @default(cuid())
-  organizationId            String       @unique
-  organization              Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  // Global constraints
-  defaultMaxHoursPerWeek    Int          @default(40)
-  defaultMaxConsecutiveDays Int          @default(6)
-  defaultMinRestHours       Int          @default(8)
-
-  // Algorithm settings
-  preferredLocationWeight   Float        @default(1.2)
-  costOptimizationEnabled   Boolean      @default(true)
-  fairDistributionEnabled   Boolean      @default(true)
-
-  // Auto-scheduling settings
-  autoAssignEnabled         Boolean      @default(false)
-  minScoreThreshold         Int          @default(60) // Don't auto-assign if score < 60
-
-  createdAt                 DateTime     @default(now())
-  updatedAt                 DateTime     @updatedAt
 }

@@ -6,6 +6,12 @@
         "shadcn@latest",
         "mcp"
       ]
+    },
+    "svelte5": {
+      "command": "node",
+      "args": [
+        "./svelte5-mcp-server/dist/index.js"
+      ]
     }
   }
 }

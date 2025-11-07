@@ -148,6 +148,43 @@
 		}
 	}
 
+	// Populate form when editing existing employee
+	$effect(() => {
+		if (employee) {
+			// Editing existing employee - populate form
+			name = employee.name || '';
+			email = employee.email || '';
+			role = employee.role || 'EMPLOYEE';
+			defaultHourlyRate = employee.defaultHourlyRate?.toString() || '';
+			phoneNumber = employee.phone || '';
+			preferredLocationId = employee.preferredLocationId || locations[0]?.id || '';
+			maxHoursPerWeek = employee.maxHoursPerWeek?.toString() || '';
+			minHoursPerWeek = employee.minHoursPerWeek?.toString() || '';
+			maxConsecutiveDays = employee.maxConsecutiveDays?.toString() || '6';
+			minRestHours = employee.minRestHours?.toString() || '8';
+			seniority = employee.seniority?.toString() || '0';
+			isFullTime = employee.isFullTime || false;
+			skills = employee.skills || [];
+			shiftTypePreferences = employee.shiftTypePreferences || [];
+		} else {
+			// Creating new employee - reset form
+			name = '';
+			email = '';
+			role = 'EMPLOYEE';
+			defaultHourlyRate = '';
+			phoneNumber = '';
+			preferredLocationId = locations[0]?.id || '';
+			maxHoursPerWeek = '';
+			minHoursPerWeek = '';
+			maxConsecutiveDays = '6';
+			minRestHours = '8';
+			seniority = '0';
+			isFullTime = false;
+			skills = [];
+			shiftTypePreferences = [];
+		}
+	});
+
 	// Reset form when modal closes
 	$effect(() => {
 		if (!open && !employee) {

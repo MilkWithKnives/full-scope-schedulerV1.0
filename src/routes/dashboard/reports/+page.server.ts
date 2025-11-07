@@ -53,7 +53,7 @@ export const load: PageServerLoad = async (event) => {
 	// Fetch shifts for the selected period
 	const shifts = await prisma.shift.findMany({
 		where: {
-			location: {
+			Location: {
 				organizationId: session.user.organizationId
 			},
 			startTime: {
@@ -62,7 +62,7 @@ export const load: PageServerLoad = async (event) => {
 			}
 		},
 		include: {
-			user: {
+			User: {
 				select: {
 					id: true,
 					name: true,
@@ -70,7 +70,7 @@ export const load: PageServerLoad = async (event) => {
 					defaultHourlyRate: true
 				}
 			},
-			location: {
+			Location: {
 				select: {
 					id: true,
 					name: true
@@ -85,7 +85,7 @@ export const load: PageServerLoad = async (event) => {
 	// Fetch comparison period shifts
 	const comparisonShifts = await prisma.shift.findMany({
 		where: {
-			location: {
+			Location: {
 				organizationId: session.user.organizationId
 			},
 			startTime: {
@@ -94,7 +94,7 @@ export const load: PageServerLoad = async (event) => {
 			}
 		},
 		include: {
-			user: {
+			User: {
 				select: {
 					id: true,
 					name: true,
@@ -107,7 +107,7 @@ export const load: PageServerLoad = async (event) => {
 	// Fetch time entries for actual hours worked
 	const timeEntries = await prisma.timeEntry.findMany({
 		where: {
-			user: {
+			User: {
 				organizationId: session.user.organizationId
 			},
 			clockIn: {
@@ -116,14 +116,14 @@ export const load: PageServerLoad = async (event) => {
 			}
 		},
 		include: {
-			user: {
+			User: {
 				select: {
 					id: true,
 					name: true,
 					defaultHourlyRate: true
 				}
 			},
-			location: {
+			Location: {
 				select: {
 					id: true,
 					name: true
@@ -154,7 +154,7 @@ export const load: PageServerLoad = async (event) => {
 
 	const futureShifts = await prisma.shift.findMany({
 		where: {
-			location: {
+			Location: {
 				organizationId: session.user.organizationId
 			},
 			startTime: {
@@ -163,7 +163,7 @@ export const load: PageServerLoad = async (event) => {
 			}
 		},
 		include: {
-			user: {
+			User: {
 				select: {
 					id: true,
 					name: true,
@@ -208,8 +208,8 @@ function calculateMetrics(
 		const hours = calculateHours(shift.startTime, shift.endTime, shift.breakMinutes);
 		totalScheduledHours += hours;
 
-		if (shift.user) {
-			const rate = shift.hourlyRate || shift.user.defaultHourlyRate || 15;
+		if (shift.User) {
+			const rate = shift.hourlyRate || shift.User.defaultHourlyRate || 15;
 			totalScheduledCost += hours * rate;
 		} else {
 			unassignedShifts++;
@@ -227,7 +227,7 @@ function calculateMetrics(
 			const hours = differenceInMinutes(new Date(entry.clockOut), new Date(entry.clockIn)) / 60;
 			totalActualHours += hours;
 
-			const rate = entry.user.defaultHourlyRate || 15;
+			const rate = entry.User.defaultHourlyRate || 15;
 			totalActualCost += hours * rate;
 		}
 	});
@@ -240,8 +240,8 @@ function calculateMetrics(
 		const hours = calculateHours(shift.startTime, shift.endTime, shift.breakMinutes);
 		comparisonScheduledHours += hours;
 
-		if (shift.user) {
-			const rate = shift.hourlyRate || shift.user.defaultHourlyRate || 15;
+		if (shift.User) {
+			const rate = shift.hourlyRate || shift.User.defaultHourlyRate || 15;
 			comparisonScheduledCost += hours * rate;
 		}
 	});
@@ -258,14 +258,14 @@ function calculateMetrics(
 	// Group by location
 	const locationMetrics = new Map();
 	shifts.forEach((shift) => {
-		const locationId = shift.location.id;
+		const locationId = shift.Location.id;
 		const hours = calculateHours(shift.startTime, shift.endTime, shift.breakMinutes);
-		const rate = shift.user ? (shift.hourlyRate || shift.user.defaultHourlyRate || 15) : 15;
-		const cost = shift.user ? hours * rate : 0;
+		const rate = shift.User ? (shift.hourlyRate || shift.User.defaultHourlyRate || 15) : 15;
+		const cost = shift.User ? hours * rate : 0;
 
 		if (!locationMetrics.has(locationId)) {
 			locationMetrics.set(locationId, {
-				name: shift.location.name,
+				name: shift.Location.name,
 				hours: 0,
 				cost: 0,
 				shifts: 0
@@ -281,15 +281,15 @@ function calculateMetrics(
 	// Group by employee
 	const employeeMetrics = new Map();
 	shifts.forEach((shift) => {
-		if (shift.user) {
-			const userId = shift.user.id;
+		if (shift.User) {
+			const userId = shift.User.id;
 			const hours = calculateHours(shift.startTime, shift.endTime, shift.breakMinutes);
-			const rate = shift.hourlyRate || shift.user.defaultHourlyRate || 15;
+			const rate = shift.hourlyRate || shift.User.defaultHourlyRate || 15;
 			const cost = hours * rate;
 
 			if (!employeeMetrics.has(userId)) {
 				employeeMetrics.set(userId, {
-					name: shift.user.name,
+					name: shift.User.name,
 					hours: 0,
 					cost: 0,
 					shifts: 0
@@ -380,9 +380,9 @@ function calculateProjections(futureShifts: any[]) {
 			const hours = calculateHours(shift.startTime, shift.endTime, shift.breakMinutes);
 			totalHours += hours;
 
-			if (shift.user) {
+			if (shift.User) {
 				assignedCount++;
-				const rate = shift.user.defaultHourlyRate || 15;
+				const rate = shift.User.defaultHourlyRate || 15;
 				totalCost += hours * rate;
 			}
 		});

@@ -24,7 +24,7 @@ export const { handle: authHandle } = SvelteKitAuth({
 
 				const user = await prisma.user.findUnique({
 					where: { email: credentials.email as string },
-					include: { organization: true }
+					include: { Organization: true }
 				});
 
 				if (!user || !user.password) {

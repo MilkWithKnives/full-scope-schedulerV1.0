@@ -16,13 +16,13 @@ export const load: PageServerLoad = async (event) => {
 			status: { in: ['PUBLISHED', 'CONFIRMED'] }
 		},
 		include: {
-			location: { select: { id: true, name: true } },
+			Location: { select: { id: true, name: true } },
 			swapRequestsFrom: {
 				include: {
 					toShift: {
 						include: {
-							user: { select: { id: true, name: true } },
-							location: { select: { name: true } }
+							User: { select: { id: true, name: true } },
+							Location: { select: { name: true } }
 						}
 					},
 					requestedBy: { select: { name: true } }
@@ -39,13 +39,13 @@ export const load: PageServerLoad = async (event) => {
 			startTime: { gte: today },
 			status: { in: ['PUBLISHED', 'CONFIRMED'] },
 			userId: { not: session.user.id },
-			location: {
+			Location: {
 				organizationId: session.user.organizationId
 			}
 		},
 		include: {
-			user: { select: { id: true, name: true } },
-			location: { select: { id: true, name: true } }
+			User: { select: { id: true, name: true } },
+			Location: { select: { id: true, name: true } }
 		},
 		orderBy: { startTime: 'asc' },
 		take: 50
@@ -60,13 +60,13 @@ export const load: PageServerLoad = async (event) => {
 		include: {
 			fromShift: {
 				include: {
-					location: { select: { name: true } }
+					Location: { select: { name: true } }
 				}
 			},
 			toShift: {
 				include: {
-					user: { select: { name: true } },
-					location: { select: { name: true } }
+					User: { select: { name: true } },
+					Location: { select: { name: true } }
 				}
 			}
 		},
@@ -85,12 +85,12 @@ export const load: PageServerLoad = async (event) => {
 			requestedBy: { select: { id: true, name: true } },
 			fromShift: {
 				include: {
-					location: { select: { name: true } }
+					Location: { select: { name: true } }
 				}
 			},
 			toShift: {
 				include: {
-					location: { select: { name: true } }
+					Location: { select: { name: true } }
 				}
 			}
 		},
@@ -124,7 +124,7 @@ export const actions = {
 			// Verify user owns the "from" shift
 			const fromShift = await prisma.shift.findUnique({
 				where: { id: fromShiftId },
-				include: { user: true }
+				include: { User: true }
 			});
 
 			if (!fromShift || fromShift.userId !== session.user.id) {
@@ -133,7 +133,7 @@ export const actions = {
 
 			const toShift = await prisma.shift.findUnique({
 				where: { id: toShiftId },
-				include: { user: true }
+				include: { User: true }
 			});
 
 			if (!toShift || !toShift.userId) {

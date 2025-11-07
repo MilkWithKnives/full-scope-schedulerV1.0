@@ -3,6 +3,7 @@
 	import { toast } from 'svelte-sonner';
 	import { formatTime, formatShortDate } from '$lib/utils/date';
 	import AIAssistantModal from './AIAssistantModal.svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 
 	interface Props {
 		open: boolean;
@@ -23,7 +24,7 @@
 	let costOptimization = $state(true);
 	let fairDistribution = $state(true);
 	let minScoreThreshold = $state(60);
-	let selectedSuggestions = $state<Set<string>>(new Set());
+	let selectedSuggestions = $state(new SvelteSet<string>());
 	let showAIAssistant = $state(false);
 	let aiResponse = $state('');
 	let aiLoading = $state(false);
@@ -53,7 +54,7 @@
 			if (result.type === 'success' && result.data?.result) {
 				suggestions = result.data.result;
 				// Select all suggestions by default
-				selectedSuggestions = new Set(suggestions.suggestions.map((s: any) => s.shiftId));
+				selectedSuggestions = new SvelteSet(suggestions.suggestions.map((s: any) => s.shiftId));
 				toast.success('Schedule suggestions generated!');
 
 				// Auto-show AI assistant if there are coverage gaps
@@ -179,7 +180,7 @@
 		} else {
 			selectedSuggestions.add(shiftId);
 		}
-		selectedSuggestions = new Set(selectedSuggestions); // Trigger reactivity
+		selectedSuggestions = new SvelteSet(selectedSuggestions); // Trigger reactivity
 	}
 
 	function getShiftDetails(shiftId: string) {
@@ -197,7 +198,7 @@
 		if (!open) {
 			setTimeout(() => {
 				suggestions = null;
-				selectedSuggestions = new Set();
+				selectedSuggestions = new SvelteSet();
 			}, 300);
 		}
 	});
@@ -427,6 +428,25 @@
 							</div>
 						</div>
 
+						<!-- AI Analysis -->
+						{#if suggestions.aiAnalysis}
+							<div class="card p-4 bg-blue-50 dark:bg-blue-900/20">
+								<div class="flex items-center gap-2 mb-3">
+									<div class="p-1 bg-blue-100 dark:bg-blue-800/30 rounded">
+										<svg class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+										</svg>
+									</div>
+									<h3 class="text-lg font-semibold text-blue-900 dark:text-blue-100">
+										🤖 AI Schedule Analysis
+									</h3>
+								</div>
+								<div class="text-sm text-blue-800 dark:text-blue-200 whitespace-pre-wrap leading-relaxed">
+									{suggestions.aiAnalysis}
+								</div>
+							</div>
+						{/if}
+
 						<!-- Suggestions List -->
 						<div>
 							<div class="flex items-center justify-between mb-3">
@@ -437,9 +457,9 @@
 									type="button"
 									onclick={() => {
 										if (selectedSuggestions.size === suggestions.suggestions.length) {
-											selectedSuggestions = new Set();
+											selectedSuggestions = new SvelteSet();
 										} else {
-											selectedSuggestions = new Set(
+											selectedSuggestions = new SvelteSet(
 												suggestions.suggestions.map((s: any) => s.shiftId)
 											);
 										}
@@ -547,7 +567,7 @@
 								variant="ghost"
 								onclick={() => {
 									suggestions = null;
-									selectedSuggestions = new Set();
+									selectedSuggestions = new SvelteSet();
 								}}
 								class="flex-1"
 							>

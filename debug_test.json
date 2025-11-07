@@ -1,0 +1,1 @@
+{"organizationId":"test","employees":[{"id":"emp1","name":"Alice","skills":["cashier"],"maxHoursPerWeek":40,"Availability":[{"dayOfWeek":"MONDAY","startTime":"09:00","endTime":"17:00"}]}],"shifts":[{"id":"shift1","startTime":"2024-11-11T10:00:00Z","endTime":"2024-11-11T14:00:00Z","role":"cashier","requiredSkills":["cashier"]}]}

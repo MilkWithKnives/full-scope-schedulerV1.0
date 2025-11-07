@@ -1,5 +1,7 @@
 import { prisma } from '$lib/server/prisma';
 import { differenceInMinutes, parseISO, isSameDay } from 'date-fns';
+import { getScheduleAnalysisAndTips } from './ai-scheduler.js';
+import { calculateFinancialAnalytics } from './financial-analytics.js';
 
 interface SchedulingConstraints {
 	maxHoursPerWeek?: number;
@@ -84,6 +86,7 @@ interface ScheduleResult {
 		averageScore: number;
 		coverageRate: number;
 	};
+	aiAnalysis?: string;
 }
 
 /**
@@ -113,7 +116,7 @@ export async function generateScheduleSuggestions(
 	// Fetch unassigned shifts in the date range
 	const unassignedShifts = await prisma.shift.findMany({
 		where: {
-			location: {
+			Location: {
 				organizationId
 			},
 			userId: null,
@@ -124,7 +127,7 @@ export async function generateScheduleSuggestions(
 			status: { in: ['DRAFT', 'PUBLISHED'] }
 		},
 		include: {
-			location: {
+			Location: {
 				select: {
 					id: true,
 					name: true
@@ -142,8 +145,8 @@ export async function generateScheduleSuggestions(
 			organizationId
 		},
 		include: {
-			availability: true,
-			shifts: {
+			Availability: true,
+			Shift: {
 				where: {
 					startTime: {
 						gte: weekStart,
@@ -171,13 +174,13 @@ export async function generateScheduleSuggestions(
 		skills: emp.skills,
 		shiftTypePreferences: emp.shiftTypePreferences,
 		seniority: emp.seniority,
-		availability: emp.availability.map((a) => ({
+		availability: emp.Availability.map((a) => ({
 			dayOfWeek: a.dayOfWeek,
 			startTime: a.startTime,
 			endTime: a.endTime,
 			isPreferred: a.isPreferred
 		})),
-		existingShifts: emp.shifts.map((s) => ({
+		existingShifts: emp.Shift.map((s) => ({
 			startTime: s.startTime,
 			endTime: s.endTime
 		}))
@@ -244,7 +247,8 @@ export async function generateScheduleSuggestions(
 		? (suggestions.length / unassignedShifts.length) * 100
 		: 100;
 
-	return {
+	// Prepare result object
+	const result = {
 		suggestions,
 		unassignableShifts: unassignable,
 		coverageGaps,
@@ -256,6 +260,99 @@ export async function generateScheduleSuggestions(
 			coverageRate: Math.round(coverageRate * 10) / 10
 		}
 	};
+
+	// Generate AI analysis and tips with financial context
+	try {
+		// Calculate financial metrics
+		const currentWeekLaborCost = suggestions.reduce((total, s) => {
+			const shift = unassignedShifts.find(shift => shift.id === s.shiftId);
+			if (shift) {
+				const hours = differenceInMinutes(shift.endTime, shift.startTime) / 60;
+				const rate = shift.hourlyRate || employeeData.find(emp => emp.id === s.employeeId)?.defaultHourlyRate || 15;
+				return total + (hours * rate);
+			}
+			return total;
+		}, 0);
+
+		const totalScheduledHours = suggestions.reduce((total, s) => {
+			const shift = unassignedShifts.find(shift => shift.id === s.shiftId);
+			if (shift) {
+				return total + differenceInMinutes(shift.endTime, shift.startTime) / 60;
+			}
+			return total;
+		}, 0);
+
+		const averageHourlyRate = totalScheduledHours > 0 ? currentWeekLaborCost / totalScheduledHours : 0;
+
+		// Calculate overtime
+		const overtimeHours = employeeData.reduce((total, emp) => {
+			const empSuggestions = suggestions.filter(s => s.employeeId === emp.id);
+			const empHours = empSuggestions.reduce((hours, s) => {
+				const shift = unassignedShifts.find(shift => shift.id === s.shiftId);
+				return shift ? hours + differenceInMinutes(shift.endTime, shift.startTime) / 60 : hours;
+			}, 0);
+			return empHours > 40 ? total + (empHours - 40) : total;
+		}, 0);
+
+		const overtimeCost = overtimeHours * averageHourlyRate * 1.5; // 1.5x overtime rate
+
+		// Get comprehensive financial analytics
+		const financialAnalytics = await calculateFinancialAnalytics(
+			organizationId,
+			weekStart,
+			weekEnd,
+			currentWeekLaborCost,
+			totalScheduledHours
+		);
+
+		const schedulingContext = {
+			employees: employeeData.map(emp => ({
+				id: emp.id,
+				name: emp.name,
+				role: emp.role,
+				hourlyRate: emp.defaultHourlyRate,
+				weeklyHours: emp.existingShifts.reduce((total, s) => {
+					return total + differenceInMinutes(s.endTime, s.startTime) / 60;
+				}, 0),
+				availability: emp.availability
+			})),
+			shifts: unassignedShifts.map(shift => ({
+				id: shift.id,
+				day: shift.startTime.toLocaleDateString('en-US', { weekday: 'long' }),
+				startTime: shift.startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+				endTime: shift.endTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+				role: shift.role,
+				location: shift.Location?.name || 'Unknown',
+				assigned: suggestions.some(s => s.shiftId === shift.id),
+				hourlyRate: shift.hourlyRate,
+				laborCost: suggestions.find(s => s.shiftId === shift.id) ?
+					(differenceInMinutes(shift.endTime, shift.startTime) / 60) *
+					(shift.hourlyRate || employeeData.find(emp => emp.id === suggestions.find(s => s.shiftId === shift.id)?.employeeId)?.defaultHourlyRate || 15) : 0
+			})),
+			coverageGaps: coverageGaps,
+			constraints: {
+				maxHoursPerWeek: constraints.maxHoursPerWeek || 40,
+				minRestHours: constraints.minRestHoursBetweenShifts || 8
+			},
+			financialContext: {
+				currentWeekLaborCost,
+				averageHourlyRate,
+				totalScheduledHours,
+				overtimeHours,
+				overtimeCost,
+				lastYearSameWeek: financialAnalytics.lastYearSameWeek,
+				organizationMetrics: financialAnalytics.organizationMetrics
+			}
+		};
+
+		const aiAnalysis = await getScheduleAnalysisAndTips(schedulingContext, result);
+		result.aiAnalysis = aiAnalysis;
+	} catch (error) {
+		console.error('AI analysis failed:', error);
+		result.aiAnalysis = 'AI analysis is temporarily unavailable, but your schedule has been generated successfully.';
+	}
+
+	return result;
 }
 
 /**
@@ -325,7 +422,7 @@ function evaluateEmployeeForShift(
 
 	// Check availability
 	const shiftDay = shift.startTime.getDay();
-	const availabilities = employee.availability.filter((a) => a.dayOfWeek === shiftDay);
+	const availabilities = employee.Availability.filter((a) => a.dayOfWeek === shiftDay);
 
 	if (availabilities.length === 0) {
 		return { score: 0, reasons: ['Employee not available on this day'], warnings: [] };
@@ -538,14 +635,14 @@ function analyzeCoverageGaps(
 		// Find employees who are close to being available
 		const almostAvailable = employees.filter((emp) => {
 			const shiftDay = shift.startTime.getDay();
-			const availability = emp.availability.find((a) => a.dayOfWeek === shiftDay);
+			const availability = emp.Availability.find((a) => a.dayOfWeek === shiftDay);
 			return !!availability; // Has some availability that day
 		});
 
 		if (almostAvailable.length > 0) {
 			// Check if they're just outside the time range
 			const needsTimeAdjustment = almostAvailable.filter((emp) => {
-				const availability = emp.availability.find((a) => a.dayOfWeek === shift.startTime.getDay());
+				const availability = emp.Availability.find((a) => a.dayOfWeek === shift.startTime.getDay());
 				if (!availability) return false;
 
 				const shiftStartMinutes = shift.startTime.getHours() * 60 + shift.startTime.getMinutes();
@@ -568,7 +665,7 @@ function analyzeCoverageGaps(
 			const totalHours = emp.existingShifts.reduce((sum, s) => {
 				return sum + differenceInMinutes(s.endTime, s.startTime) / 60;
 			}, 0);
-			return totalHours < 20 && emp.availability.some((a) => a.dayOfWeek === shift.startTime.getDay());
+			return totalHours < 20 && emp.Availability.some((a) => a.dayOfWeek === shift.startTime.getDay());
 		});
 
 		if (underMinHours.length > 0) {
@@ -592,7 +689,7 @@ function analyzeCoverageGaps(
 		gaps.push({
 			day,
 			timeRange: `${startTime} - ${endTime}`,
-			location: shift.location?.name || 'Unknown',
+			location: shift.Location?.name || 'Unknown',
 			role: shift.role,
 			suggestions
 		});

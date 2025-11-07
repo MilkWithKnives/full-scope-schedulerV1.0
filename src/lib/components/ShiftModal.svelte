@@ -16,23 +16,58 @@
 	let { open = $bindable(), onClose, locations, users, selectedDate = null, shift = null }: Props = $props();
 
 	// Form state
-	let locationId = $state(shift?.locationId || locations[0]?.id || '');
-	let userId = $state(shift?.userId || '');
-	let role = $state(shift?.role || '');
-	let date = $state(shift ? formatDate(new Date(shift.startTime)) : selectedDate ? formatDate(selectedDate) : formatDate(new Date()));
-	let startTime = $state(shift ? formatTimeUtil(shift.startTime) : '09:00');
-	let endTime = $state(shift ? formatTimeUtil(shift.endTime) : '17:00');
-	let breakMinutes = $state(shift?.breakMinutes || 30);
-	let hourlyRate = $state(shift?.hourlyRate || '');
-	let notes = $state(shift?.notes || '');
+	let locationId = $state('');
+	let userId = $state('');
+	let role = $state('');
+	let date = $state('');
+	let startTime = $state('09:00');
+	let endTime = $state('17:00');
+	let breakMinutes = $state(30);
+	let hourlyRate = $state('');
+	let notes = $state('');
 
 	// Shift requirements
-	let requiredSkills = $state(shift?.requiredSkills || []);
-	let shiftType = $state(shift?.shiftType || '');
-	let priority = $state(shift?.priority || 0);
-	let minSeniority = $state(shift?.minSeniority || '');
+	let requiredSkills = $state<string[]>([]);
+	let shiftType = $state('');
+	let priority = $state(0);
+	let minSeniority = $state('');
 
 	let submitting = $state(false);
+
+	// Update form when shift or selectedDate changes
+	$effect(() => {
+		if (shift) {
+			// Editing existing shift - populate form
+			locationId = shift.locationId || locations[0]?.id || '';
+			userId = shift.userId || '';
+			role = shift.role || '';
+			date = formatDate(new Date(shift.startTime));
+			startTime = formatTimeUtil(shift.startTime);
+			endTime = formatTimeUtil(shift.endTime);
+			breakMinutes = shift.breakMinutes || 30;
+			hourlyRate = shift.hourlyRate?.toString() || '';
+			notes = shift.notes || '';
+			requiredSkills = shift.requiredSkills || [];
+			shiftType = shift.shiftType || '';
+			priority = shift.priority || 0;
+			minSeniority = shift.minSeniority?.toString() || '';
+		} else {
+			// Creating new shift - reset form
+			locationId = locations[0]?.id || '';
+			userId = '';
+			role = '';
+			date = selectedDate ? formatDate(selectedDate) : formatDate(new Date());
+			startTime = '09:00';
+			endTime = '17:00';
+			breakMinutes = 30;
+			hourlyRate = '';
+			notes = '';
+			requiredSkills = [];
+			shiftType = '';
+			priority = 0;
+			minSeniority = '';
+		}
+	});
 
 	// Common restaurant roles
 	const commonRoles = [

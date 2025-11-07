@@ -12,7 +12,7 @@ export const load: PageServerLoad = async (event) => {
 			userId: session.user.id
 		},
 		include: {
-			reviewer: {
+			User_TimeOffRequest_reviewedByToUser: {
 				select: { name: true }
 			}
 		},
@@ -25,12 +25,12 @@ export const load: PageServerLoad = async (event) => {
 		? await prisma.timeOffRequest.findMany({
 				where: {
 					status: 'PENDING',
-					user: {
+					User_TimeOffRequest_userIdToUser: {
 						organizationId: session.user.organizationId
 					}
 				},
 				include: {
-					user: {
+					User_TimeOffRequest_userIdToUser: {
 						select: { id: true, name: true, role: true }
 					}
 				},

@@ -57,7 +57,7 @@
 		window.URL.revokeObjectURL(url);
 	}
 
-	const rangeLabel = $derived(() => {
+	const rangeLabel = $derived.by(() => {
 		switch (data.dateRange.type) {
 			case 'week':
 				return 'This Week';
@@ -100,7 +100,7 @@
 		<div>
 			<h1 class="text-3xl font-bold text-slate-900 dark:text-white">Reports & Analytics</h1>
 			<p class="text-slate-600 dark:text-slate-400 mt-1">
-				Performance insights for {rangeLabel()}
+				Performance insights for {rangeLabel}
 			</p>
 		</div>
 

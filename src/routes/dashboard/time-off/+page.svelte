@@ -218,8 +218,8 @@
 						<div class="flex items-start justify-between gap-4">
 							<div class="flex-1">
 								<div class="font-medium text-slate-900 dark:text-white mb-1">
-									{request.user.name}
-									<span class="text-sm text-slate-500">({request.user.role.toLowerCase()})</span>
+									{request.User_TimeOffRequest_userIdToUser.name}
+									<span class="text-sm text-slate-500">({request.User_TimeOffRequest_userIdToUser.role.toLowerCase()})</span>
 								</div>
 								<div class="text-sm text-slate-600 dark:text-slate-400">
 									{format(new Date(request.startDate), 'MMM d')} - {format(new Date(request.endDate), 'MMM d, yyyy')}
@@ -286,9 +286,9 @@
 										"{request.reason}"
 									</div>
 								{/if}
-								{#if request.reviewer}
+								{#if request.User_TimeOffRequest_reviewedByToUser}
 									<div class="text-xs text-slate-500 dark:text-slate-400">
-										Reviewed by {request.reviewer.name}
+										Reviewed by {request.User_TimeOffRequest_reviewedByToUser.name}
 									</div>
 								{/if}
 							</div>

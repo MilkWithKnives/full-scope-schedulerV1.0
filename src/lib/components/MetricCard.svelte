@@ -20,7 +20,7 @@
 		purple: 'text-purple-500'
 	};
 
-	const trendColor = $derived(() => {
+	const trendColor = $derived.by(() => {
 		if (!change) return '';
 		if (trend === 'down') {
 			return change < 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
@@ -28,7 +28,7 @@
 		return change > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
 	});
 
-	const trendIcon = $derived(() => {
+	const trendIcon = $derived.by(() => {
 		if (!change) return '';
 		return change > 0 ? '↑' : '↓';
 	});
@@ -40,8 +40,8 @@
 			<span class="text-2xl">{icon}</span>
 		{/if}
 		{#if change !== undefined}
-			<div class="{trendColor()} text-sm font-medium">
-				{trendIcon()} {Math.abs(change)}%
+			<div class="{trendColor} text-sm font-medium">
+				{trendIcon} {Math.abs(change)}%
 			</div>
 		{/if}
 	</div>

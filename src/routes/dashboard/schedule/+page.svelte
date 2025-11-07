@@ -1,331 +1,365 @@
 <script lang="ts">
 	import type { PageData } from './$types';
+	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
+
+	let ScheduleXCalendarClient: any = $state(null);
+	let mounted = $state(false);
 	import Button from '$lib/components/Button.svelte';
 	import ShiftModal from '$lib/components/ShiftModal.svelte';
 	import AutoScheduleModal from '$lib/components/AutoScheduleModal.svelte';
-	import BulkActionsModal from '$lib/components/BulkActionsModal.svelte';
 	import { toast } from 'svelte-sonner';
-	import {
-		getWeekDays,
-		formatWeekRange,
-		nextWeek,
-		previousWeek,
-		isToday,
-		formatDayOfWeek,
-		formatDayNumber,
-		formatTime,
-		calculateShiftHours,
-		calculateLaborCost
-	} from '$lib/utils/date';
+	import * as Card from '$lib/components/ui/card';
+	import { CalendarDays, Users, Clock, TrendingUp, Plus, Filter, Settings } from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
 
-	let currentWeekStart = $state(new Date(data.weekStart));
-	let selectedLocation = $state<string | null>(data.locations[0]?.id || null);
+	// State
 	let showShiftModal = $state(false);
 	let showAutoScheduleModal = $state(false);
-	let showBulkActionsModal = $state(false);
-	let selectedDate = $state<Date | null>(null);
-	let selectedShift = $state<any | null>(null);
-	let selectionMode = $state(false);
-	let selectedShiftIds = $state<Set<string>>(new Set());
+	let selectedShift: any | null = $state(null);
+	let selectedDate: Date | null = $state(null);
+	let selectedLocation: string | null = $state(data.locations[0]?.id || null);
 
-	// Calculate week days
-	const weekDays = $derived(getWeekDays(currentWeekStart));
-	const weekRange = $derived(formatWeekRange(currentWeekStart));
-
-	// Filter shifts by selected location
-	const filteredShifts = $derived(
-		data.shifts.filter((shift) => !selectedLocation || shift.location.id === selectedLocation)
-	);
-
-	// Group shifts by date
-	const shiftsByDate = $derived(() => {
-		const grouped = new Map();
-		weekDays.forEach((day) => {
-			const dayKey = day.toISOString().split('T')[0];
-			grouped.set(dayKey, []);
-		});
-
-		filteredShifts.forEach((shift) => {
-			const shiftDate = new Date(shift.startTime);
-			const dayKey = shiftDate.toISOString().split('T')[0];
-			if (grouped.has(dayKey)) {
-				grouped.get(dayKey).push(shift);
-			}
-		});
-
-		return grouped;
+	// Dynamically import the calendar component on client-side only
+	onMount(async () => {
+		if (browser) {
+			const module = await import('$lib/components/ScheduleXCalendarClient.svelte');
+			ScheduleXCalendarClient = module.default;
+			mounted = true;
+		}
 	});
 
-	// Calculate total labor cost for the week
-	const weeklyLaborCost = $derived(() => {
-		let total = 0;
-		filteredShifts.forEach((shift) => {
-			const hours = calculateShiftHours(shift.startTime, shift.endTime, shift.breakMinutes);
-			const rate = shift.hourlyRate || shift.user?.defaultHourlyRate || 15;
-			total += calculateLaborCost(hours, rate);
-		});
-		return total;
-	});
+	// Convert shifts to Schedule-X event format
+	function convertShiftsToEvents(shifts: any[]) {
+		return shifts
+			.filter((shift) => !selectedLocation || (shift.location && shift.location.id === selectedLocation))
+			.map((shift) => {
+				const start = new Date(shift.startTime);
+				const end = new Date(shift.endTime);
 
-	// Calculate total hours for the week
-	const weeklyHours = $derived(() => {
-		let total = 0;
-		filteredShifts.forEach((shift) => {
-			total += calculateShiftHours(shift.startTime, shift.endTime, shift.breakMinutes);
-		});
-		return total;
-	});
+				// Get color based on shift status
+				let colorScheme = 'default';
+				if (shift.status === 'PUBLISHED') colorScheme = 'primary';
+				else if (shift.status === 'CONFIRMED') colorScheme = 'success';
+				else if (shift.status === 'CANCELLED') colorScheme = 'danger';
 
-	function handlePreviousWeek() {
-		currentWeekStart = previousWeek(currentWeekStart);
-		// TODO: Fetch new week's data
-		toast.info('Loading previous week...');
+				// Convert to Temporal.ZonedDateTime (required by Schedule-X for timed events)
+				const toTemporal = (date: Date) => {
+					const year = date.getFullYear();
+					const month = String(date.getMonth() + 1).padStart(2, '0');
+					const day = String(date.getDate()).padStart(2, '0');
+					const hour = String(date.getHours()).padStart(2, '0');
+					const minute = String(date.getMinutes()).padStart(2, '0');
+					const second = String(date.getSeconds()).padStart(2, '0');
+					const isoString = `${year}-${month}-${day}T${hour}:${minute}:${second}-05:00[America/New_York]`;
+					return Temporal.ZonedDateTime.from(isoString);
+				};
+
+				return {
+					id: shift.id,
+					title: `${shift.role}${shift.user ? ` - ${shift.user.name}` : ' (Unassigned)'}`,
+					start: toTemporal(start),
+					end: toTemporal(end),
+					calendarId: colorScheme,
+					description: shift.notes || '',
+					_shift: shift // Store original shift data
+				};
+			});
 	}
 
-	function handleNextWeek() {
-		currentWeekStart = nextWeek(currentWeekStart);
-		// TODO: Fetch new week's data
-		toast.info('Loading next week...');
+	// Derived calendar events that update when location filter changes
+	const calendarEvents = $derived(convertShiftsToEvents(data.shifts));
+	// Event handlers for the calendar
+	function handleEventClick(calendarEvent: any) {
+		const shift = data.shifts.find((s) => s.id === calendarEvent.id);
+		if (shift) {
+			selectedShift = shift;
+			selectedDate = null;
+			showShiftModal = true;
+		}
 	}
 
-	function handleDayClick(day: Date) {
-		selectedDate = day;
+	function handleClickDateTime(dateTime: string) {
+		const [datePart, timePart] = dateTime.split(' ');
+		selectedDate = new Date(`${datePart}T${timePart}`);
 		selectedShift = null;
 		showShiftModal = true;
 	}
 
-	function handleShiftClick(shift: any) {
-		selectedShift = shift;
-		selectedDate = null;
-		showShiftModal = true;
-	}
+	async function handleEventUpdate(updatedEvent: any) {
+		try {
+			console.log('🔄 handleEventUpdate called with:', updatedEvent);
+			console.log('🔍 Looking for shift with ID:', updatedEvent.id);
+			console.log('📋 Available shift IDs:', data.shifts.map(s => s.id));
 
-	function getShiftColor(shift: any) {
-		// Color code by status
-		if (shift.status === 'PUBLISHED') return 'bg-blue-100 dark:bg-blue-900/20 border-blue-300 dark:border-blue-800';
-		if (shift.status === 'CONFIRMED') return 'bg-green-100 dark:bg-green-900/20 border-green-300 dark:border-green-800';
-		if (shift.status === 'CANCELLED') return 'bg-red-100 dark:bg-red-900/20 border-red-300 dark:border-red-800';
-		return 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700'; // DRAFT
-	}
+			const shift = data.shifts.find((s) => s.id === updatedEvent.id);
+			console.log('✅ Found existing shift:', !!shift, shift?.id);
 
-	function toggleShiftSelection(shiftId: string) {
-		if (selectedShiftIds.has(shiftId)) {
-			selectedShiftIds.delete(shiftId);
-		} else {
-			selectedShiftIds.add(shiftId);
+			const [startDate, startTime] = updatedEvent.start.split(' ');
+			const [endDate, endTime] = updatedEvent.end.split(' ');
+
+			const formData = new FormData();
+
+			if (shift) {
+				// Update existing shift
+				formData.append('shiftId', shift.id);
+				formData.append('locationId', shift.location.id);
+				formData.append('userId', shift.userId || '');
+				formData.append('role', shift.role);
+				formData.append('date', startDate);
+				formData.append('startTime', startTime);
+				formData.append('endTime', endTime);
+				formData.append('breakMinutes', shift.breakMinutes.toString());
+				formData.append('notes', shift.notes || '');
+				formData.append('hourlyRate', shift.hourlyRate?.toString() || '');
+				formData.append('requiredSkills', JSON.stringify(shift.requiredSkills || []));
+				formData.append('shiftType', shift.shiftType || '');
+				formData.append('priority', shift.priority?.toString() || '0');
+				formData.append('minSeniority', shift.minSeniority?.toString() || '');
+
+				const response = await fetch('?/updateShift', {
+					method: 'POST',
+					body: formData
+				});
+
+				if (response.ok) {
+					toast.success('Shift updated successfully');
+					window.location.reload();
+				} else {
+					toast.error('Failed to update shift');
+				}
+			} else {
+				// Create new shift - this happens when dragging creates a new event
+				console.log('Creating new shift from drag and drop:', updatedEvent);
+
+				// Use default values for new shift
+				formData.append('locationId', data.locations[0]?.id || '');
+				formData.append('userId', ''); // Unassigned initially
+				formData.append('role', 'Staff'); // Default role
+				formData.append('date', startDate);
+				formData.append('startTime', startTime);
+				formData.append('endTime', endTime);
+				formData.append('breakMinutes', '30'); // Default break
+				formData.append('notes', '');
+				formData.append('hourlyRate', '');
+				formData.append('requiredSkills', JSON.stringify([]));
+				formData.append('shiftType', '');
+				formData.append('priority', '0');
+				formData.append('minSeniority', '');
+
+				const response = await fetch('?/createShift', {
+					method: 'POST',
+					body: formData
+				});
+
+				if (response.ok) {
+					toast.success('Shift created successfully');
+					window.location.reload();
+				} else {
+					const result = await response.json();
+					toast.error(result.error || 'Failed to create shift');
+				}
+			}
+		} catch (error) {
+			console.error('Error handling event update:', error);
+			toast.error('Failed to process shift change');
 		}
-		selectedShiftIds = new Set(selectedShiftIds); // Trigger reactivity
 	}
 
-	function toggleSelectionMode() {
-		selectionMode = !selectionMode;
-		if (!selectionMode) {
-			selectedShiftIds = new Set();
-		}
-	}
+	// Calculate statistics
+	const filteredShifts = $derived(data.shifts.filter((shift) => !selectedLocation || shift.location.id === selectedLocation));
 
-	function selectAllShifts() {
-		selectedShiftIds = new Set(filteredShifts.map((shift) => shift.id));
-	}
+	const weeklyHours = $derived(filteredShifts.reduce((total, shift) => {
+		const start = new Date(shift.startTime);
+		const end = new Date(shift.endTime);
+		const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+		const netHours = hours - shift.breakMinutes / 60;
+		return total + netHours;
+	}, 0));
 
-	function deselectAllShifts() {
-		selectedShiftIds = new Set();
-	}
-
-	const selectedShifts = $derived(
-		filteredShifts.filter((shift) => selectedShiftIds.has(shift.id))
-	);
+	const weeklyLaborCost = $derived(filteredShifts.reduce((total, shift) => {
+		const start = new Date(shift.startTime);
+		const end = new Date(shift.endTime);
+		const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+		const netHours = hours - shift.breakMinutes / 60;
+		const rate = shift.hourlyRate || shift.user?.defaultHourlyRate || 15;
+		return total + netHours * rate;
+	}, 0));
 </script>
 
 <svelte:head>
 	<title>Schedule - ShiftHappens</title>
 </svelte:head>
 
-<div class="max-w-7xl mx-auto space-y-6">
+<div class="max-w-[1600px] mx-auto space-y-6">
 	<!-- Header -->
-	<div class="flex items-center justify-between">
-		<div>
-			<h1 class="text-3xl font-bold text-slate-900 dark:text-white">Schedule</h1>
-			<p class="text-slate-600 dark:text-slate-400 mt-1">{weekRange}</p>
-		</div>
-
-		<div class="flex items-center gap-3">
-			<!-- Location Filter -->
-			{#if data.locations.length > 1}
-				<select
-					bind:value={selectedLocation}
-					class="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
-				>
-					<option value={null}>All Locations</option>
-					{#each data.locations as location}
-						<option value={location.id}>{location.name}</option>
-					{/each}
-				</select>
-			{/if}
-
-			<Button variant="ghost" onclick={toggleSelectionMode}>
-				{selectionMode ? '✕ Cancel' : '☑️ Select'}
-			</Button>
-			<Button variant="secondary" onclick={() => (showAutoScheduleModal = true)}>
-				🤖 Auto-Schedule
-			</Button>
-			<Button variant="primary" onclick={() => (showShiftModal = true)}>
-				➕ Add Shift
-			</Button>
-		</div>
-	</div>
-
-	<!-- Selection Mode Bar -->
-	{#if selectionMode}
-		<div class="card p-4 bg-primary-50 dark:bg-primary-900/20 border-2 border-primary-500">
-			<div class="flex items-center justify-between">
-				<div class="flex items-center gap-4">
-					<span class="font-medium text-slate-900 dark:text-white">
-						{selectedShiftIds.size} shift{selectedShiftIds.size !== 1 ? 's' : ''} selected
-					</span>
-					{#if selectedShiftIds.size < filteredShifts.length}
-						<button
-							type="button"
-							onclick={selectAllShifts}
-							class="text-sm text-primary-600 dark:text-primary-400 hover:underline"
-						>
-							Select All ({filteredShifts.length})
-						</button>
-					{:else}
-						<button
-							type="button"
-							onclick={deselectAllShifts}
-							class="text-sm text-primary-600 dark:text-primary-400 hover:underline"
-						>
-							Deselect All
-						</button>
-					{/if}
+	<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+		<div class="space-y-2">
+			<div class="flex items-center gap-3">
+				<div class="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
+					<CalendarDays class="h-6 w-6 text-blue-600 dark:text-blue-400" />
 				</div>
-				{#if selectedShiftIds.size > 0}
-					<Button variant="primary" onclick={() => (showBulkActionsModal = true)}>
-						⚡ Bulk Actions
-					</Button>
-				{/if}
+				<div>
+					<h1 class="text-3xl font-bold text-slate-900 dark:text-white">Schedule</h1>
+					<p class="text-slate-600 dark:text-slate-400">
+						Manage your team's schedule with drag-and-drop
+					</p>
+				</div>
 			</div>
 		</div>
-	{/if}
+
+		<div class="flex flex-wrap items-center gap-3">
+			<!-- Location Filter -->
+			{#if data.locations.length > 1}
+				<div class="flex items-center gap-2">
+					<Filter class="h-4 w-4 text-slate-500" />
+					<select
+						bind:value={selectedLocation}
+						class="px-3 py-2 bg-white border rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+					>
+						<option value={null}>All Locations</option>
+						{#each data.locations as location}
+							<option value={location.id}>{location.name}</option>
+						{/each}
+					</select>
+				</div>
+			{/if}
+
+			<Button variant="ghost" onclick={() => (showAutoScheduleModal = true)} class="gap-2">
+				<Settings class="h-4 w-4" />
+				Auto-Schedule
+			</Button>
+			<Button variant="primary" onclick={() => {
+				selectedShift = null;
+				selectedDate = new Date();
+				showShiftModal = true;
+			}} class="gap-2">
+				<Plus class="h-4 w-4" />
+				Add Shift
+			</Button>
+		</div>
+	</div>
 
 	<!-- Week Stats -->
-	<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-		<div class="card p-4">
-			<div class="text-sm text-slate-600 dark:text-slate-400">Total Hours</div>
-			<div class="text-2xl font-bold text-slate-900 dark:text-white">{weeklyHours().toFixed(1)}h</div>
-		</div>
-		<div class="card p-4">
-			<div class="text-sm text-slate-600 dark:text-slate-400">Labor Cost</div>
-			<div class="text-2xl font-bold text-green-600 dark:text-green-400">${weeklyLaborCost().toFixed(2)}</div>
-		</div>
-		<div class="card p-4">
-			<div class="text-sm text-slate-600 dark:text-slate-400">Total Shifts</div>
-			<div class="text-2xl font-bold text-slate-900 dark:text-white">{filteredShifts.length}</div>
-		</div>
-	</div>
-
-	<!-- Week Navigation -->
-	<div class="flex items-center justify-center gap-4">
-		<Button variant="ghost" onclick={handlePreviousWeek}>
-			← Previous
-		</Button>
-		<Button variant="ghost" onclick={() => (currentWeekStart = new Date())}>
-			Today
-		</Button>
-		<Button variant="ghost" onclick={handleNextWeek}>
-			Next →
-		</Button>
-	</div>
-
-	<!-- Schedule Grid -->
-	<div class="card overflow-hidden">
-		<div class="grid grid-cols-7 gap-px bg-slate-200 dark:bg-slate-700">
-			{#each weekDays as day}
-				{@const dayKey = day.toISOString().split('T')[0]}
-				{@const dayShifts = shiftsByDate().get(dayKey) || []}
-				{@const today = isToday(day)}
-
-				<div
-					class="bg-white dark:bg-slate-800 min-h-[200px] {today ? 'ring-2 ring-primary-500' : ''}"
-					role="button"
-					tabindex="0"
-					onclick={() => handleDayClick(day)}
-				>
-					<!-- Day Header -->
-					<div class="p-3 border-b border-slate-200 dark:border-slate-700 {today ? 'bg-primary-50 dark:bg-primary-900/20' : ''}">
-						<div class="text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">
-							{formatDayOfWeek(day)}
-						</div>
-						<div class="text-lg font-bold text-slate-900 dark:text-white">
-							{formatDayNumber(day)}
-						</div>
+	<div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+		<Card.Root class="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20">
+			<Card.Content class="p-6">
+				<div class="flex items-center justify-between">
+					<div class="space-y-2">
+						<p class="text-sm font-medium text-blue-600 dark:text-blue-400">Total Hours</p>
+						<p class="text-3xl font-bold text-blue-900 dark:text-blue-100">
+							{weeklyHours.toFixed(1)}h
+						</p>
 					</div>
-
-					<!-- Shifts for this day -->
-					<div class="p-2 space-y-2">
-						{#each dayShifts as shift}
-							<button
-								type="button"
-								class="w-full text-left p-2 rounded border {getShiftColor(shift)} hover:shadow-md transition-shadow relative"
-								onclick={(e) => {
-									e.stopPropagation();
-									if (selectionMode) {
-										toggleShiftSelection(shift.id);
-									} else {
-										handleShiftClick(shift);
-									}
-								}}
-							>
-								{#if selectionMode}
-									<div class="absolute top-1 right-1">
-										<input
-											type="checkbox"
-											checked={selectedShiftIds.has(shift.id)}
-											onchange={() => toggleShiftSelection(shift.id)}
-											class="w-4 h-4 text-primary-500 rounded focus:ring-2 focus:ring-primary-500"
-											onclick={(e) => e.stopPropagation()}
-										/>
-									</div>
-								{/if}
-								<div class="text-xs font-medium text-slate-900 dark:text-white">
-									{formatTime(shift.startTime)} - {formatTime(shift.endTime)}
-								</div>
-								<div class="text-xs text-slate-600 dark:text-slate-400 truncate">
-									{shift.user?.name || 'Unassigned'}
-								</div>
-								<div class="text-xs text-slate-500 dark:text-slate-500">
-									{shift.role}
-								</div>
-							</button>
-						{/each}
-
-						{#if dayShifts.length === 0}
-							<div class="text-center py-8 text-slate-400 dark:text-slate-600 text-sm">
-								No shifts
-							</div>
-						{/if}
+					<div class="p-3 bg-blue-100 dark:bg-blue-800/30 rounded-full">
+						<Clock class="h-6 w-6 text-blue-600 dark:text-blue-400" />
 					</div>
 				</div>
-			{/each}
-		</div>
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root class="border-0 shadow-sm bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20">
+			<Card.Content class="p-6">
+				<div class="flex items-center justify-between">
+					<div class="space-y-2">
+						<p class="text-sm font-medium text-green-600 dark:text-green-400">Labor Cost</p>
+						<p class="text-3xl font-bold text-green-900 dark:text-green-100">
+							${weeklyLaborCost.toFixed(2)}
+						</p>
+					</div>
+					<div class="p-3 bg-green-100 dark:bg-green-800/30 rounded-full">
+						<TrendingUp class="h-6 w-6 text-green-600 dark:text-green-400" />
+					</div>
+				</div>
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root class="border-0 shadow-sm bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20">
+			<Card.Content class="p-6">
+				<div class="flex items-center justify-between">
+					<div class="space-y-2">
+						<p class="text-sm font-medium text-purple-600 dark:text-purple-400">Total Shifts</p>
+						<p class="text-3xl font-bold text-purple-900 dark:text-purple-100">
+							{filteredShifts.length}
+						</p>
+					</div>
+					<div class="p-3 bg-purple-100 dark:bg-purple-800/30 rounded-full">
+						<Users class="h-6 w-6 text-purple-600 dark:text-purple-400" />
+					</div>
+				</div>
+			</Card.Content>
+		</Card.Root>
 	</div>
+
+	<!-- Schedule-X Calendar -->
+	<Card.Root class="border-0 shadow-lg">
+		<Card.Header class="pb-4">
+			<div class="flex items-center justify-between">
+				<Card.Title class="flex items-center gap-2">
+					<CalendarDays class="h-5 w-5 text-blue-600 dark:text-blue-400" />
+					Weekly Schedule
+				</Card.Title>
+				<div class="text-sm text-slate-500 dark:text-slate-400">
+					Drag and drop to create or move shifts
+				</div>
+			</div>
+		</Card.Header>
+		<Card.Content class="p-0">
+			<div class="sx-svelte-calendar-wrapper">
+				{#if browser && mounted && ScheduleXCalendarClient}
+					{@const CalendarComponent = ScheduleXCalendarClient}
+					<CalendarComponent
+						events={calendarEvents}
+						onEventClick={handleEventClick}
+						onClickDateTime={handleClickDateTime}
+						onEventUpdate={handleEventUpdate}
+					/>
+				{:else}
+					<div class="flex items-center justify-center h-96 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+						<div class="text-center space-y-4">
+							<div class="animate-spin">
+								<CalendarDays class="h-12 w-12 text-blue-500 dark:text-blue-400" />
+							</div>
+							<p class="text-slate-600 dark:text-slate-400 font-medium">Loading calendar...</p>
+						</div>
+					</div>
+				{/if}
+			</div>
+		</Card.Content>
+	</Card.Root>
 
 	<!-- Empty State -->
 	{#if filteredShifts.length === 0}
-		<div class="card p-12 text-center">
-			<div class="text-5xl mb-4">📅</div>
-			<h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">No shifts scheduled yet</h3>
-			<p class="text-slate-600 dark:text-slate-400 mb-6">
-				Get started by adding your first shift to the schedule
-			</p>
-			<Button variant="primary" onclick={() => (showShiftModal = true)}>
-				➕ Create First Shift
-			</Button>
-		</div>
+		<Card.Root class="border-0 shadow-sm">
+			<Card.Content class="p-12 text-center">
+				<div class="space-y-6">
+					<div class="p-4 bg-blue-100 dark:bg-blue-900/20 rounded-full w-20 h-20 mx-auto flex items-center justify-center">
+						<CalendarDays class="h-10 w-10 text-blue-600 dark:text-blue-400" />
+					</div>
+					<div class="space-y-2">
+						<h3 class="text-xl font-bold text-slate-900 dark:text-white">
+							No shifts scheduled yet
+						</h3>
+						<p class="text-slate-600 dark:text-slate-400 max-w-md mx-auto">
+							Get started by adding your first shift to the schedule. You can also use drag and drop to create shifts directly on the calendar.
+						</p>
+					</div>
+					<Button
+						variant="primary"
+						onclick={() => {
+							selectedShift = null;
+							selectedDate = new Date();
+							showShiftModal = true;
+						}}
+						class="gap-2"
+					>
+						<Plus class="h-4 w-4" />
+						Create First Shift
+					</Button>
+				</div>
+			</Card.Content>
+		</Card.Root>
 	{/if}
 </div>
 
@@ -352,12 +386,46 @@
 	employees={data.users}
 />
 
-<!-- Bulk Actions Modal -->
-<BulkActionsModal
-	bind:open={showBulkActionsModal}
-	onClose={() => {
-		showBulkActionsModal = false;
-	}}
-	selectedShifts={selectedShifts}
-	users={data.users}
-/>
+<style>
+	:global(.sx-svelte-calendar-wrapper) {
+		width: 100%;
+		height: 900px;
+		max-height: 90vh;
+	}
+
+	/* Custom styling for Schedule-X calendar */
+	:global(.sx__calendar) {
+		border-radius: 0;
+		border: none;
+	}
+
+	:global(.sx__week-grid__event) {
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	:global(.sx__week-grid__event:hover) {
+		transform: translateY(-1px);
+		box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+	}
+
+	/* Dark mode support */
+	:global(.dark .sx__calendar) {
+		background-color: #1e293b;
+		color: #f1f5f9;
+	}
+
+	:global(.dark .sx__week-grid__header) {
+		background-color: #0f172a;
+		border-color: #334155;
+	}
+
+	:global(.dark .sx__week-grid__day) {
+		border-color: #334155;
+	}
+
+	:global(.dark .sx__time-axis__hour) {
+		color: #94a3b8;
+		border-color: #334155;
+	}
+</style>

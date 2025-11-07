@@ -28,7 +28,7 @@
 	);
 
 	// Group shifts by day
-	const shiftsByDay = $derived(() => {
+	const shiftsByDay = $derived.by(() => {
 		const grouped: Record<string, typeof data.shifts> = {};
 
 		weekDays.forEach((day) => {
@@ -170,7 +170,7 @@
 		<div class="space-y-6">
 			{#each weekDays as day}
 				{@const dayKey = day.toISOString().split('T')[0]}
-				{@const dayShifts = shiftsByDay()[dayKey] || []}
+				{@const dayShifts = shiftsByDay[dayKey] || []}
 				{@const isToday = isSameDay(day, new Date())}
 
 				<div class="{isToday ? 'ring-2 ring-primary-500 rounded-lg p-4' : ''}">

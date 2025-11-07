@@ -18,20 +18,20 @@ export const load: PageServerLoad = async (event) => {
 				gte: weekStart,
 				lte: weekEnd
 			},
-			location: {
+			Location: {
 				organizationId: session.user.organizationId
 			},
 			status: { in: ['PUBLISHED', 'CONFIRMED'] }
 		},
 		include: {
-			user: {
+			User: {
 				select: {
 					id: true,
 					name: true,
 					role: true
 				}
 			},
-			location: {
+			Location: {
 				select: {
 					id: true,
 					name: true
@@ -73,19 +73,19 @@ export const load: PageServerLoad = async (event) => {
 	// Get active clock-ins (who's working right now)
 	const activeClockIns = await prisma.timeEntry.findMany({
 		where: {
-			user: {
+			User: {
 				organizationId: session.user.organizationId
 			},
 			clockOut: null
 		},
 		include: {
-			user: {
+			User: {
 				select: {
 					id: true,
 					name: true
 				}
 			},
-			location: {
+			Location: {
 				select: {
 					id: true,
 					name: true

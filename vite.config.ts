@@ -1,8 +1,17 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+	ssr: {
+		// Don't bundle Prisma Client for SSR - keep it external
+		noExternal: [],
+		external: ['@prisma/client']
+	},
 	plugins: [
 		sveltekit(),
 		SvelteKitPWA({
